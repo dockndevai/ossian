@@ -4,7 +4,7 @@ name: ossian
 #
 #   docker compose up -d
 #   docker compose exec ollama ollama pull nomic-embed-text
-#   docker compose exec ollama ollama pull qwen2.5:0.5b
+#   docker compose exec ollama ollama pull qwen2.5:3b
 #
 # Ports deliberately avoid the defaults so this can run beside other local services
 # (spring-llm-gateway on 8080, a native postgres on 5432, a native redis on 6379).
@@ -75,7 +75,12 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+    volumes:
+      # Adds the embedding route the sample config does not carry. See the file for why it has
+      # to restate the chat route too.
+      - ./gateway:/config:ro
     environment:
+      SPRING_CONFIG_ADDITIONAL_LOCATION: /config/application-ossian.yml
       # Inside the compose network the backends are service names, not localhost.
       LLM_OLLAMA_URI: http://ollama:11434
       LLM_VLLM_URI: http://vllm-not-present:8000

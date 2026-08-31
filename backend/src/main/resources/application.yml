@@ -1,5 +1,5 @@
 server:
-  # 8080 is taken by spring-llm-gateway in local dev; keep them side by side.
+  # Kept off 8080 so this runs beside the gateway and anything else local.
   port: 8081
 
 spring:
@@ -47,11 +47,15 @@ spring:
     openai:
       # Points at spring-llm-gateway, which is OpenAI-compatible. Swap for Ollama or a cloud
       # endpoint by changing this one URL; nothing else in the app knows the difference.
-      base-url: ${LLM_BASE_URL:http://localhost:8080}
+      # 8090 is where docker-compose.yml publishes the gateway, not the gateway's own 8080.
+      base-url: ${LLM_BASE_URL:http://localhost:8090}
       api-key: ${LLM_API_KEY:sk-demo-local-key}
       chat:
         options:
-          model: ${LLM_CHAT_MODEL:qwen2.5:0.5b}
+          # 3b is the smallest size that reliably answers *from* the retrieved passage. 0.5b
+          # retrieves fine but then contradicts the text it was given, which reads as a RAG bug
+          # and isn't one.
+          model: ${LLM_CHAT_MODEL:qwen2.5:3b}
           temperature: 0.1
       embedding:
         options:
@@ -77,7 +81,7 @@ ossian:
     similarity-threshold: 0.5
     cache-seconds: 300
   chat:
-    model: ${LLM_CHAT_MODEL:qwen2.5:0.5b}
+    model: ${LLM_CHAT_MODEL:qwen2.5:3b}
     temperature: 0.1
     max-tokens: 800
   cors:

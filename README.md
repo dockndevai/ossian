@@ -59,7 +59,7 @@ docker compose exec ollama ollama pull nomic-embed-text
 ```
 
 ```bash
-docker compose exec ollama ollama pull qwen2.5:0.5b
+docker compose exec ollama ollama pull qwen2.5:3b
 ```
 
 Backend:
@@ -95,6 +95,11 @@ the moment it is containerised.
 
 Don't want the gateway? Set `LLM_BASE_URL=http://ollama:11434` on the backend and it talks to
 Ollama directly — you lose virtual keys, quotas and metering, nothing else.
+
+The gateway image ships the gateway project's own sample routes, which match chat models only.
+`gateway/application-ossian.yml` is mounted over them to add the embedding model; without it
+ingestion gets a 404 from the gateway before it ever reaches Ollama. Compose lists are replaced
+rather than merged, so that file restates the chat route too.
 
 ---
 
@@ -146,7 +151,7 @@ is a model swap that quietly degrades retrieval.
 | `ossian.retrieval.similarity-threshold` | `0.5` | Below this, refuse to answer |
 | `ossian.retrieval.cache-seconds` | `300` | Retrieval cache TTL |
 | `ossian.chat.system-prompt` | see config | Instruction that enforces citation and refusal |
-| `LLM_BASE_URL` | `http://localhost:8080` | OpenAI-compatible endpoint |
+| `LLM_BASE_URL` | `http://localhost:8090` | OpenAI-compatible endpoint |
 | `LLM_EMBED_MODEL` / `LLM_EMBED_DIMENSIONS` | `nomic-embed-text` / `768` | Must agree |
 
 Caches have deliberately different lifetimes: `embeddings` lives 30 days (identical text always

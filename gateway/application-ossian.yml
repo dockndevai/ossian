@@ -1,0 +1,22 @@
+# Route overrides for the spring-llm-gateway image, mounted into the container.
+#
+# The image ships the gateway project's own sample routes, which only match chat models. Ossian
+# also needs the embedding model routed, or ingestion 404s at the gateway before it ever reaches
+# Ollama. A YAML list is replaced, not merged, by a higher-precedence config file, so this file
+# has to restate every route the stack needs rather than adding one.
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            # Chat and embeddings both land here: one Ollama, two models, selected on the model
+            # field of the request body.
+            - id: ollama
+              uri: ${LLM_OLLAMA_URI:http://localhost:11434}
+              predicates:
+                - Path=/v1/**
+                - LlmModel=qwen2.5*,llama3.2*,nomic-embed-text*
+              filters:
+                - LlmAuth
+                - LlmQuota
