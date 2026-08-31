@@ -1,7 +1,7 @@
 import { useAuth } from "react-oidc-context";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import ChatPage from "./pages/ChatPage";
-import DocumentsPage from "./pages/DocumentsPage";
+import NotebookPage from "./pages/NotebookPage";
+import VectorsPage from "./pages/VectorsPage";
 import AdminPage from "./pages/AdminPage";
 
 export default function App() {
@@ -43,8 +43,8 @@ export default function App() {
       <header>
         <strong>Ossian</strong>
         <nav>
-          <NavLink to="/chat">Ask</NavLink>
-          <NavLink to="/documents">Documents</NavLink>
+          <NavLink to="/notebook">Notebook</NavLink>
+          {isAdmin && <NavLink to="/vectors">Vectors</NavLink>}
           {isAdmin && <NavLink to="/admin">Admin</NavLink>}
         </nav>
         <span className="spacer" />
@@ -57,10 +57,12 @@ export default function App() {
 
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/chat" replace />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/documents" element={<DocumentsPage />} />
-          <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/chat" replace />} />
+          <Route path="/" element={<Navigate to="/notebook" replace />} />
+          <Route path="/notebook" element={<NotebookPage />} />
+          {/* Hiding a tab is presentation only; the backend enforces the same rule on every
+              request, so a hand-typed URL gets a 403 rather than data. */}
+          <Route path="/vectors" element={isAdmin ? <VectorsPage /> : <Navigate to="/notebook" replace />} />
+          <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/notebook" replace />} />
         </Routes>
       </main>
     </>

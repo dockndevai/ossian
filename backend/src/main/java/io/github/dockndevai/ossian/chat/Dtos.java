@@ -13,7 +13,9 @@ public final class Dtos {
 
 	public record AskRequest(@NotBlank @Size(max = 4000) String question,
 			/** Optional: restrict retrieval to these document ids. */
-			List<String> documentIds) {
+			List<String> documentIds,
+			/** Optional: restrict retrieval to one namespace. Null or blank searches all of them. */
+			@Size(max = 128) String namespace) {
 	}
 
 	/**

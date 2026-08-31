@@ -8,8 +8,14 @@
   "accessTokenLifespan": 1800,
   "roles": {
     "realm": [
-      { "name": "ossian-user",  "description": "Ask questions and upload documents" },
-      { "name": "ossian-admin", "description": "Ingestion jobs, re-indexing and retrieval metrics" }
+      {
+        "name": "ossian-user",
+        "description": "Ask questions and upload documents"
+      },
+      {
+        "name": "ossian-admin",
+        "description": "Ingestion jobs, re-indexing and retrieval metrics"
+      }
     ]
   },
   "clients": [
@@ -56,6 +62,20 @@
             "included.client.audience": "ossian-frontend",
             "access.token.claim": "true"
           }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ]
     }
@@ -68,9 +88,22 @@
       "email": "admin@ossian.local",
       "firstName": "Ada",
       "lastName": "Admin",
-      "attributes": { "tenant": ["acme"] },
-      "credentials": [ { "type": "password", "value": "admin", "temporary": false } ],
-      "realmRoles": [ "ossian-user", "ossian-admin" ]
+      "attributes": {
+        "tenant": [
+          "acme"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ossian-user",
+        "ossian-admin"
+      ]
     },
     {
       "username": "user",
@@ -79,9 +112,21 @@
       "email": "user@ossian.local",
       "firstName": "Uma",
       "lastName": "User",
-      "attributes": { "tenant": ["acme"] },
-      "credentials": [ { "type": "password", "value": "user", "temporary": false } ],
-      "realmRoles": [ "ossian-user" ]
+      "attributes": {
+        "tenant": [
+          "acme"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "user",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ossian-user"
+      ]
     },
     {
       "username": "other",
@@ -90,9 +135,22 @@
       "email": "other@ossian.local",
       "firstName": "Otto",
       "lastName": "Othertenant",
-      "attributes": { "tenant": ["globex"] },
-      "credentials": [ { "type": "password", "value": "other", "temporary": false } ],
-      "realmRoles": [ "ossian-user", "ossian-admin" ]
+      "attributes": {
+        "tenant": [
+          "globex"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "other",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ossian-user",
+        "ossian-admin"
+      ]
     }
   ]
 }

@@ -49,6 +49,20 @@ public class DocumentEntity {
 	@Column(name = "content_hash", nullable = false, length = 64)
 	private String contentHash;
 
+	/**
+	 * Which slice of the tenant's corpus this belongs to. Not a security boundary — the tenant
+	 * is. A user may read across their own namespaces; they can never read another tenant's.
+	 */
+	@Column(nullable = false)
+	private String namespace = "default";
+
+	/** Identity in the system this was imported from, for event-driven ingestion. Null for uploads. */
+	@Column(name = "external_id")
+	private String externalId;
+
+	/** Which importer produced it, for tracing an unexpected document back to its origin. */
+	private String source;
+
 	private String title;
 
 	@Enumerated(EnumType.STRING)
@@ -177,6 +191,30 @@ public class DocumentEntity {
 
 	public void setUpdatedAt(Instant updatedAt) {
 		this.updatedAt = updatedAt;
+	}
+
+	public String getNamespace() {
+		return this.namespace;
+	}
+
+	public void setNamespace(String namespace) {
+		this.namespace = namespace;
+	}
+
+	public String getExternalId() {
+		return this.externalId;
+	}
+
+	public void setExternalId(String externalId) {
+		this.externalId = externalId;
+	}
+
+	public String getSource() {
+		return this.source;
+	}
+
+	public void setSource(String source) {
+		this.source = source;
 	}
 
 }

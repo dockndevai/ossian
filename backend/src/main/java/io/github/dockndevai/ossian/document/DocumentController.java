@@ -9,6 +9,7 @@ import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.ingest.IngestionJob;
 import io.github.dockndevai.ossian.ingest.IngestionJobRepository;
 import io.github.dockndevai.ossian.ingest.IngestionService;
+import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.tenant.TenantContext;
 
 import org.springframework.data.domain.Page;
@@ -31,11 +32,13 @@ import org.springframework.web.server.ResponseStatusException;
 public class DocumentController {
 
 	public record DocumentView(UUID id, String filename, String title, String contentType, long sizeBytes,
-			String status, int chunkCount, String errorMessage, String uploadedBy, Instant createdAt) {
+			String status, int chunkCount, String errorMessage, String uploadedBy, String namespace,
+			String externalId, String source, Instant createdAt) {
 
 		static DocumentView of(DocumentEntity d) {
 			return new DocumentView(d.getId(), d.getFilename(), d.getTitle(), d.getContentType(), d.getSizeBytes(),
-					d.getStatus().name(), d.getChunkCount(), d.getErrorMessage(), d.getUploadedBy(), d.getCreatedAt());
+					d.getStatus().name(), d.getChunkCount(), d.getErrorMessage(), d.getUploadedBy(),
+					d.getNamespace(), d.getExternalId(), d.getSource(), d.getCreatedAt());
 		}
 	}
 
@@ -54,22 +57,30 @@ public class DocumentController {
 
 	private final OssianProperties properties;
 
+	private final NamespaceService namespaces;
+
 	public DocumentController(DocumentRepository documents, DocumentContentRepository contents,
 			IngestionJobRepository jobs, IngestionService ingestion, TenantContext tenant,
-			OssianProperties properties) {
+			OssianProperties properties, NamespaceService namespaces) {
 		this.documents = documents;
 		this.contents = contents;
 		this.jobs = jobs;
 		this.ingestion = ingestion;
 		this.tenant = tenant;
 		this.properties = properties;
+		this.namespaces = namespaces;
 	}
 
 	@GetMapping
 	public Page<DocumentView> list(@RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "20") int size) {
-		return this.documents
-			.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId(), PageRequest.of(page, Math.min(size, 100)))
+			@RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String namespace) {
+		PageRequest pageable = PageRequest.of(page, Math.min(size, 100));
+		// No namespace means every namespace this tenant has — an absent filter widens within the
+		// tenant, never past it.
+		return ((namespace == null || namespace.isBlank())
+				? this.documents.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId(), pageable)
+				: this.documents.findByTenantIdAndNamespaceOrderByCreatedAtDesc(this.tenant.tenantId(),
+						this.namespaces.resolve(namespace), pageable))
 			.map(DocumentView::of);
 	}
 
@@ -79,7 +90,8 @@ public class DocumentController {
 	}
 
 	@PostMapping
-	public ResponseEntity<UploadResponse> upload(@RequestParam("file") MultipartFile file) throws IOException {
+	public ResponseEntity<UploadResponse> upload(@RequestParam("file") MultipartFile file,
+			@RequestParam(required = false) String namespace) throws IOException {
 		if (file.isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty");
 		}
@@ -90,15 +102,19 @@ public class DocumentController {
 
 		byte[] content = file.getBytes();
 		String hash = IngestionService.hash(content);
+		// An unknown namespace resolves to the default rather than erroring: a typo that silently
+		// returned an empty corpus would read as "my documents are gone".
+		String ns = this.namespaces.resolve(namespace);
 
-		// Same bytes, same tenant: return the existing document rather than embedding it twice.
-		var existing = this.documents.findByTenantIdAndContentHash(this.tenant.tenantId(), hash);
+		// Same bytes, same namespace: return the existing document rather than embedding it twice.
+		var existing = this.documents.findByTenantIdAndNamespaceAndContentHash(this.tenant.tenantId(), ns, hash);
 		if (existing.isPresent()) {
 			return ResponseEntity.ok(new UploadResponse(existing.get().getId(), null,
 					existing.get().getStatus().name(), true));
 		}
 
 		DocumentEntity doc = new DocumentEntity();
+		doc.setNamespace(ns);
 		doc.setTenantId(this.tenant.tenantId());
 		doc.setFilename(file.getOriginalFilename() == null ? "upload" : file.getOriginalFilename());
 		doc.setContentType(file.getContentType());

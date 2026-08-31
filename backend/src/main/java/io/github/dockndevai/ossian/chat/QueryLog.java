@@ -31,6 +31,9 @@ public class QueryLog {
 	@Column(nullable = false)
 	private String question;
 
+	/** Which namespace was searched, so a gap can be traced to the corpus that lacked it. */
+	private String namespace;
+
 	@Column(name = "chunks_retrieved", nullable = false)
 	private int chunksRetrieved;
 
@@ -138,6 +141,14 @@ public class QueryLog {
 
 	public void setCreatedAt(Instant createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	public String getNamespace() {
+		return this.namespace;
+	}
+
+	public void setNamespace(String namespace) {
+		this.namespace = namespace;
 	}
 
 }

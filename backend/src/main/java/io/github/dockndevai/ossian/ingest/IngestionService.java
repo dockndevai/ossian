@@ -14,10 +14,10 @@ import org.slf4j.LoggerFactory;
 import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
+import io.github.dockndevai.ossian.settings.SettingsService;
 
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.scheduling.annotation.Async;
@@ -46,6 +46,9 @@ public class IngestionService {
 
 	public static final String META_CHUNK_INDEX = "chunk_index";
 
+	/** Which slice of the tenant's corpus a chunk belongs to; the retriever filters on it. */
+	public static final String META_NAMESPACE = "namespace";
+
 	private final DocumentRepository documents;
 
 	private final IngestionJobRepository jobs;
@@ -54,12 +57,15 @@ public class IngestionService {
 
 	private final OssianProperties properties;
 
+	private final SettingsService settings;
+
 	public IngestionService(DocumentRepository documents, IngestionJobRepository jobs, VectorStore vectorStore,
-			OssianProperties properties) {
+			OssianProperties properties, SettingsService settings) {
 		this.documents = documents;
 		this.jobs = jobs;
 		this.vectorStore = vectorStore;
 		this.properties = properties;
+		this.settings = settings;
 	}
 
 	/** SHA-256 of the raw bytes, so the same file uploaded twice is recognised rather than duplicated. */
@@ -116,10 +122,16 @@ public class IngestionService {
 		List<Document> parsed = reader.get();
 
 		OssianProperties.Ingest cfg = this.properties.getIngest();
-		TokenTextSplitter splitter = TokenTextSplitter.builder()
-			.withChunkSize(cfg.getChunkSize())
-			.withMinChunkSizeChars(Math.max(50, cfg.getChunkOverlap()))
-			.build();
+		// Chunking is read from settings rather than straight from the file, so a tenant can tune
+		// it without a redeploy. Changing it only affects documents indexed afterwards; existing
+		// chunks stay as they were until reindexed, which is why the setting is flagged as
+		// requiring a reindex in the UI.
+		// The tenant comes from the entity, not from the security context: this runs on an async
+		// thread where the context is not propagated.
+		String tenantId = entity.getTenantId();
+		ChunkSplitter splitter = new ChunkSplitter(
+				this.settings.effectiveIntFor(tenantId, SettingsService.INGEST_CHUNK_SIZE),
+				this.settings.effectiveIntFor(tenantId, SettingsService.INGEST_CHUNK_OVERLAP));
 		List<Document> chunks = splitter.apply(parsed);
 
 		for (int i = 0; i < chunks.size(); i++) {
@@ -128,6 +140,7 @@ public class IngestionService {
 			meta.put(META_DOCUMENT, entity.getId().toString());
 			meta.put(META_FILENAME, entity.getFilename());
 			meta.put(META_CHUNK_INDEX, i);
+			meta.put(META_NAMESPACE, entity.getNamespace());
 		}
 
 		// Batched so a large document does not become one enormous embedding request that the
@@ -146,6 +159,16 @@ public class IngestionService {
 		this.documents.save(entity);
 		log.info("Ingested {} ({} chunks) for tenant {}", filename, chunks.size(), entity.getTenantId());
 		return chunks.size();
+	}
+
+	/**
+	 * Removes a document's chunks, leaving the row. Used when replacing a document's content:
+	 * the old vectors have to go before the new ones arrive, or both answer questions and the
+	 * stale text may score higher than the current text.
+	 */
+	@Transactional
+	public void deleteChunks(DocumentEntity entity) {
+		this.vectorStore.delete("%s == '%s'".formatted(META_DOCUMENT, entity.getId()));
 	}
 
 	/** Removes a document's chunks from the vector store, then the row. */
