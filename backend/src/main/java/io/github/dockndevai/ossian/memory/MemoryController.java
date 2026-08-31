@@ -53,8 +53,11 @@ public class MemoryController {
 
 	private final MemoryService memories;
 
-	public MemoryController(MemoryService memories) {
+	private final io.github.dockndevai.ossian.audit.AuditService audit;
+
+	public MemoryController(MemoryService memories, io.github.dockndevai.ossian.audit.AuditService audit) {
 		this.memories = memories;
+		this.audit = audit;
 	}
 
 	@PostMapping
@@ -62,6 +65,12 @@ public class MemoryController {
 		MemoryService.Memory saved = this.memories.remember(request.agentId(), request.sessionId(),
 				request.subject(), (request.kind() == null || request.kind().isBlank()) ? "fact" : request.kind(),
 				request.content(), request.metadata(), request.importance(), request.ttlSeconds());
+		// The subject and kind, not the content: an audit row that copies what was recorded
+		// becomes a second store of the same personal data, in a table meant to watch it.
+		this.audit.record(io.github.dockndevai.ossian.audit.AuditService.MEMORY_WRITTEN, "memory",
+				saved.id().toString(), null,
+				"agent=" + saved.agentId() + " kind=" + saved.kind()
+						+ (saved.subject() == null ? "" : " subject=" + saved.subject()));
 		return ResponseEntity.status(HttpStatus.CREATED).body(saved);
 	}
 
@@ -93,7 +102,12 @@ public class MemoryController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> forget(@PathVariable UUID id) {
-		return this.memories.forget(id) ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+		if (!this.memories.forget(id)) {
+			return ResponseEntity.notFound().build();
+		}
+		this.audit.record(io.github.dockndevai.ossian.audit.AuditService.MEMORY_FORGOTTEN, "memory",
+				id.toString(), null, null);
+		return ResponseEntity.noContent().build();
 	}
 
 	/** Ends a conversation's memory. What you call when a session is over. */

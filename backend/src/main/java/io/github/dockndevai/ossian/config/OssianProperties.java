@@ -23,6 +23,8 @@ public class OssianProperties {
 
 	private Fetch fetch = new Fetch();
 
+	private RateLimit rateLimit = new RateLimit();
+
 	public Ingest getIngest() {
 		return this.ingest;
 	}
@@ -61,6 +63,14 @@ public class OssianProperties {
 
 	public void setFetch(Fetch fetch) {
 		this.fetch = fetch;
+	}
+
+	public RateLimit getRateLimit() {
+		return this.rateLimit;
+	}
+
+	public void setRateLimit(RateLimit rateLimit) {
+		this.rateLimit = rateLimit;
 	}
 
 	public Cors getCors() {
@@ -331,6 +341,41 @@ public class OssianProperties {
 
 		public void setUserAgent(String userAgent) {
 			this.userAgent = userAgent;
+		}
+
+	}
+
+
+	/** How many requests a caller may make. Zero or less disables the limit for that kind. */
+	public static class RateLimit {
+
+		/**
+		 * Default for API keys. Deliberately below the human allowance: a key belongs to a
+		 * process, and a process in a retry loop is the realistic way this service falls over.
+		 * A key that genuinely needs more gets its own value on its row.
+		 */
+		private int keyRequestsPerMinute = 120;
+
+		/**
+		 * Default for signed-in people. Higher, because a console page fans out to several
+		 * endpoints at once and a person cannot loop.
+		 */
+		private int userRequestsPerMinute = 600;
+
+		public int getKeyRequestsPerMinute() {
+			return this.keyRequestsPerMinute;
+		}
+
+		public void setKeyRequestsPerMinute(int keyRequestsPerMinute) {
+			this.keyRequestsPerMinute = keyRequestsPerMinute;
+		}
+
+		public int getUserRequestsPerMinute() {
+			return this.userRequestsPerMinute;
+		}
+
+		public void setUserRequestsPerMinute(int userRequestsPerMinute) {
+			this.userRequestsPerMinute = userRequestsPerMinute;
 		}
 
 	}

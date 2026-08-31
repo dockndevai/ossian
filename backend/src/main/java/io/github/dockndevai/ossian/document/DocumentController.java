@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import io.github.dockndevai.ossian.fetch.UrlFetcher;
+import io.github.dockndevai.ossian.audit.AuditService;
 import io.github.dockndevai.ossian.ingest.IngestionService;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.caller.CallerContext;
@@ -66,9 +67,11 @@ public class DocumentController {
 
 	private final UrlFetcher fetcher;
 
+	private final AuditService audit;
+
 	public DocumentController(DocumentRepository documents, DocumentContentRepository contents,
 			IngestionJobRepository jobs, IngestionService ingestion, CallerContext tenant,
-			OssianProperties properties, NamespaceService namespaces, UrlFetcher fetcher) {
+			OssianProperties properties, NamespaceService namespaces, UrlFetcher fetcher, AuditService audit) {
 		this.documents = documents;
 		this.contents = contents;
 		this.jobs = jobs;
@@ -77,6 +80,7 @@ public class DocumentController {
 		this.properties = properties;
 		this.namespaces = namespaces;
 		this.fetcher = fetcher;
+		this.audit = audit;
 	}
 
 	@GetMapping
@@ -138,6 +142,8 @@ public class DocumentController {
 		job = this.jobs.save(job);
 
 		this.ingestion.ingestAsync(doc.getId(), content, doc.getFilename(), job.getId());
+		this.audit.record(AuditService.DOCUMENT_UPLOADED, "document", doc.getId().toString(), ns,
+				doc.getFilename());
 		return ResponseEntity.status(HttpStatus.ACCEPTED)
 			.body(new UploadResponse(doc.getId(), job.getId(), doc.getStatus().name(), false));
 	}
@@ -198,17 +204,22 @@ public class DocumentController {
 		job = this.jobs.save(job);
 
 		this.ingestion.ingestAsync(doc.getId(), content, doc.getFilename(), job.getId());
+		this.audit.record(AuditService.DOCUMENT_UPLOADED, "document", doc.getId().toString(), ns,
+				fetched.finalUrl());
 		return ResponseEntity.status(HttpStatus.ACCEPTED)
 			.body(new UploadResponse(doc.getId(), job.getId(), doc.getStatus().name(), false));
 	}
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable UUID id) {
-		this.ingestion.deleteDocument(load(id));
+		DocumentEntity doc = load(id);
+		this.ingestion.deleteDocument(doc);
+		this.audit.record(AuditService.DOCUMENT_DELETED, "document", id.toString(), doc.getNamespace(),
+				doc.getFilename());
 		return ResponseEntity.noContent().build();
 	}
 
-	/** Look up by id AND tenant: an id alone must never reach another tenant's document. */
+	/** A missing document is 404 rather than 403, so the response does not confirm what exists. */
 	private DocumentEntity load(UUID id) {
 		return this.documents.findById(id)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));

@@ -3,7 +3,11 @@ package io.github.dockndevai.ossian.config;
 import java.util.List;
 
 import io.github.dockndevai.ossian.apikey.ApiKeyAuthenticationFilter;
+import io.github.dockndevai.ossian.apikey.ApiKeyRepository;
 import io.github.dockndevai.ossian.apikey.ApiKeyService;
+import io.github.dockndevai.ossian.caller.CallerContext;
+import io.github.dockndevai.ossian.ratelimit.RateLimitFilter;
+import io.github.dockndevai.ossian.ratelimit.RateLimiter;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -40,8 +44,9 @@ public class SecurityConfig {
 	 */
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http,
-			@Qualifier("corsConfigurationSource") CorsConfigurationSource cors, ApiKeyService apiKeys)
-			throws Exception {
+			@Qualifier("corsConfigurationSource") CorsConfigurationSource cors, ApiKeyService apiKeys,
+			RateLimiter limiter, CallerContext caller, ApiKeyRepository keyRepository,
+			OssianProperties properties) throws Exception {
 		return http
 			.cors(c -> c.configurationSource(cors))
 			// No cookies, no sessions: nothing for a forged request to ride on.
@@ -64,6 +69,10 @@ public class SecurityConfig {
 			// A Keycloak token passes straight through to the resource server, so nothing about
 			// how people sign in changes.
 			.addFilterBefore(new ApiKeyAuthenticationFilter(apiKeys), BearerTokenAuthenticationFilter.class)
+			// After authorisation, so the caller is known and an anonymous request cannot spend
+			// somebody else's allowance.
+			.addFilterAfter(new RateLimitFilter(limiter, caller, keyRepository, properties),
+					org.springframework.security.web.access.intercept.AuthorizationFilter.class)
 			.build();
 	}
 

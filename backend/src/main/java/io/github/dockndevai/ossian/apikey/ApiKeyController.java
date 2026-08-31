@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
+import io.github.dockndevai.ossian.audit.AuditService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -26,18 +27,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApiKeyController {
 
 	public record CreateRequest(@NotBlank @Size(max = 200) String name, List<String> roles,
-			@Size(max = 128) String namespace, Instant expiresAt) {
+			@Size(max = 128) String namespace, Integer requestsPerMinute, Instant expiresAt) {
 	}
 
 	/** What a key looks like in a listing: enough to recognise, never enough to use. */
 	public record KeyView(UUID id, String name, String keyPrefix, List<String> roles, String namespace,
-			String createdBy, Instant createdAt, Instant lastUsedAt, Instant expiresAt, Instant revokedAt,
-			boolean active) {
+			Integer requestsPerMinute, String createdBy, Instant createdAt, Instant lastUsedAt,
+			Instant expiresAt, Instant revokedAt, boolean active) {
 
 		static KeyView of(ApiKeyEntity k) {
 			return new KeyView(k.getId(), k.getName(), k.getKeyPrefix(), k.roleList(), k.getNamespace(),
-					k.getCreatedBy(), k.getCreatedAt(), k.getLastUsedAt(), k.getExpiresAt(), k.getRevokedAt(),
-					k.isUsable(Instant.now()));
+					k.getRequestsPerMinute(), k.getCreatedBy(), k.getCreatedAt(), k.getLastUsedAt(),
+					k.getExpiresAt(), k.getRevokedAt(), k.isUsable(Instant.now()));
 		}
 	}
 
@@ -52,8 +53,11 @@ public class ApiKeyController {
 
 	private final ApiKeyService service;
 
-	public ApiKeyController(ApiKeyService service) {
+	private final AuditService audit;
+
+	public ApiKeyController(ApiKeyService service, AuditService audit) {
 		this.service = service;
+		this.audit = audit;
 	}
 
 	@GetMapping
@@ -64,7 +68,11 @@ public class ApiKeyController {
 	@PostMapping
 	public ResponseEntity<CreatedKey> create(@Valid @RequestBody CreateRequest request) {
 		ApiKeyService.Issued issued = this.service.issue(request.name(), request.roles(), request.namespace(),
-				request.expiresAt());
+				request.requestsPerMinute(), request.expiresAt());
+		// The prefix and name, never the secret — an audit row is not a place to put a credential.
+		this.audit.record(AuditService.KEY_ISSUED, "apikey", issued.key().getKeyPrefix(),
+				issued.key().getNamespace(),
+				issued.key().getName() + " roles=" + issued.key().getRoles());
 		return ResponseEntity.status(HttpStatus.CREATED)
 			.body(new CreatedKey(KeyView.of(issued.key()), issued.secret(),
 					"Copy this now. It is stored as a hash and cannot be shown again."));
@@ -72,7 +80,11 @@ public class ApiKeyController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> revoke(@PathVariable UUID id) {
-		return this.service.revoke(id) ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+		if (!this.service.revoke(id)) {
+			return ResponseEntity.notFound().build();
+		}
+		this.audit.record(AuditService.KEY_REVOKED, "apikey", id.toString(), null, null);
+		return ResponseEntity.noContent().build();
 	}
 
 }

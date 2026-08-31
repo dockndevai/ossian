@@ -301,6 +301,21 @@ export interface StuckDocument {
   since: string;
 }
 
+export interface AuditEntry {
+  id: number;
+  at: string;
+  actor: string;
+  subject: string | null;
+  machine: boolean;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  namespace: string | null;
+  detail: string | null;
+  outcome: string;
+  ip: string | null;
+}
+
 export const api = {
   ask: (token: string | undefined, question: string, documentIds?: string[], namespace?: string) =>
     request<AskResponse>(token, "/chat", {
@@ -423,6 +438,15 @@ export const api = {
 
   reindex: (token: string | undefined, id: string) =>
     request<unknown>(token, `/admin/documents/${id}/reindex`, { method: "POST" }),
+
+  audit: (token: string | undefined, action?: string, limit = 100) =>
+    request<AuditEntry[]>(
+      token,
+      `/admin/audit?limit=${limit}` + (action ? `&action=${encodeURIComponent(action)}` : ""),
+    ),
+
+  auditActions: (token: string | undefined) =>
+    request<{ action: string; occurrences: number; mostRecent: string }[]>(token, "/admin/audit/actions"),
 
   throughput: (token: string | undefined, hours = 24) =>
     request<Throughput>(token, `/admin/pipeline/throughput?hours=${hours}`),

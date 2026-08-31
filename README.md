@@ -143,6 +143,53 @@ is a model swap that quietly degrades retrieval.
 
 ---
 
+## Rate limits
+
+A token bucket per caller, in Redis so the limit holds across instances — two replicas each
+enforcing sixty a minute enforce a hundred and twenty. The refill, the read and the spend happen
+inside one Lua evaluation so two requests cannot interleave.
+
+A bucket rather than a fixed window, because a window is wrong at its edges: a caller can spend a
+full allowance in the last instant of one and again in the first instant of the next, so 60/minute
+permits 120 in two seconds. A bucket refills continuously and has no edge — while still allowing
+the bursts that are normal, since a page loading six panels makes six requests.
+
+| Caller | Default | Why |
+|---|---|---|
+| API key | 120/min | a process in a retry loop is the realistic way this falls over |
+| Person | 600/min | a console page fans out, and a person cannot loop |
+
+Per-key with `requestsPerMinute` at issue time: a bulk importer legitimately makes thousands an
+hour and an interactive agent makes dozens, and one limit suiting both suits neither. Refusals
+carry `Retry-After`, because a client told only "no" retries immediately and makes it worse.
+
+**It fails open.** If Redis is unreachable requests are allowed, with a warning. A limiter that
+fails closed turns a cache outage into a total outage, and one caller making too many requests is
+survivable in a way that refusing every request is not. The warning matters — a limiter that has
+silently stopped limiting looks exactly like one with nothing to do.
+
+---
+
+## Audit
+
+Append-only, and readable in the console. Every entry records the actor **as presented at the
+time** rather than a foreign key to a user: people leave and keys get revoked, and
+`key:nightly-import` still means something afterwards where a dangling reference does not.
+
+Recorded: document uploaded and deleted, key issued and revoked, setting changed, memory written
+and forgotten — with the outcome, so a rejected change is in the trail alongside an accepted one.
+
+Two things are deliberately *not* recorded. Request bodies, because an audit row carrying them
+becomes a second copy of the data it is meant to be watching. And memory content — the subject and
+kind are enough to answer "what did this agent learn about this person" without restating it.
+
+Writes use `REQUIRES_NEW`, so a row survives the rollback of the thing it describes: an attempt
+that failed halfway is more interesting than one that succeeded, and joining the audit to the
+caller's transaction would discard exactly those. A failed audit write never fails the request —
+it is logged at ERROR instead, because a gap you know about is worth far more than one you do not.
+
+---
+
 ## Ingestion observability
 
 Prometheus has the rates; the **Console** answers the question people actually ask, which is why

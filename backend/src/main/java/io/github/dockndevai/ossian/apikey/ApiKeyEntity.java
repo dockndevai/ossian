@@ -36,6 +36,10 @@ public class ApiKeyEntity {
 	@Column(length = 128)
 	private String namespace;
 
+	/** This key's own ceiling; null means the installation default. */
+	@Column(name = "requests_per_minute")
+	private Integer requestsPerMinute;
+
 	@Column(name = "created_by")
 	private String createdBy;
 
@@ -149,6 +153,15 @@ public class ApiKeyEntity {
 
 	public void setRevokedAt(Instant revokedAt) {
 		this.revokedAt = revokedAt;
+	}
+
+
+	public Integer getRequestsPerMinute() {
+		return this.requestsPerMinute;
+	}
+
+	public void setRequestsPerMinute(Integer requestsPerMinute) {
+		this.requestsPerMinute = requestsPerMinute;
 	}
 
 }

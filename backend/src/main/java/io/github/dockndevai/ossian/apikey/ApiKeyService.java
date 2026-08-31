@@ -55,7 +55,8 @@ public class ApiKeyService {
 	}
 
 	@Transactional
-	public Issued issue(String name, List<String> roles, String namespace, Instant expiresAt) {
+	public Issued issue(String name, List<String> roles, String namespace, Integer requestsPerMinute,
+			Instant expiresAt) {
 		byte[] bytes = new byte[SECRET_BYTES];
 		this.random.nextBytes(bytes);
 		String secret = PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -67,6 +68,7 @@ public class ApiKeyService {
 		entity.setRoles(roles == null || roles.isEmpty() ? "ossian-user" : String.join(",", roles));
 		entity.setNamespace((namespace == null || namespace.isBlank()) ? null : namespace);
 		entity.setCreatedBy(this.caller.username());
+		entity.setRequestsPerMinute(requestsPerMinute);
 		entity.setExpiresAt(expiresAt);
 
 		ApiKeyEntity saved = this.repository.save(entity);

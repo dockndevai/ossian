@@ -3,6 +3,7 @@ import { useAuth } from "react-oidc-context";
 import { api, type DocumentView } from "../api/client";
 import { useNamespace } from "../app/NamespaceContext";
 import PipelinePanel from "./PipelinePanel";
+import AuditPanel from "./AuditPanel";
 
 /**
  * The maintenance view.
@@ -104,6 +105,8 @@ export default function AdminPage() {
       </div>
 
       <PipelinePanel />
+
+      <AuditPanel />
 
       <section className="panel">
         <h2>Corpus</h2>
