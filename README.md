@@ -37,6 +37,8 @@ The service holds **no upstream model credentials**. It speaks the OpenAI API to
 [spring-llm-gateway](https://github.com/dockndevai/spring-llm-gateway), which owns routing,
 token quotas and metering. Point `LLM_BASE_URL` straight at Ollama to cut it out.
 
+**[dockndevai.github.io/ossian-site →](https://dockndevai.github.io/ossian-site/)** — the project site.
+
 ---
 
 ## A tour
