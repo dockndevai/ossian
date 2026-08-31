@@ -1,0 +1,182 @@
+package io.github.dockndevai.openbook.document;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+
+/** A source file the tenant uploaded, and the state of its journey into the vector store. */
+@Entity
+@Table(name = "documents")
+public class DocumentEntity {
+
+	public enum Status {
+
+		/** Stored, not yet chunked or embedded. */
+		PENDING,
+		/** Chunking and embedding in flight. */
+		PROCESSING,
+		/** Chunks are in the vector store and answerable. */
+		READY,
+		/** Ingestion failed; {@code errorMessage} says why. */
+		FAILED
+
+	}
+
+	@Id
+	@GeneratedValue
+	private UUID id;
+
+	@Column(name = "tenant_id", nullable = false)
+	private String tenantId;
+
+	@Column(nullable = false)
+	private String filename;
+
+	@Column(name = "content_type")
+	private String contentType;
+
+	@Column(name = "size_bytes", nullable = false)
+	private long sizeBytes;
+
+	@Column(name = "content_hash", nullable = false, length = 64)
+	private String contentHash;
+
+	private String title;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private Status status = Status.PENDING;
+
+	@Column(name = "chunk_count", nullable = false)
+	private int chunkCount;
+
+	@Column(name = "error_message")
+	private String errorMessage;
+
+	@Column(name = "uploaded_by")
+	private String uploadedBy;
+
+	@Column(name = "created_at", nullable = false)
+	private Instant createdAt = Instant.now();
+
+	@Column(name = "updated_at", nullable = false)
+	private Instant updatedAt = Instant.now();
+
+	@PreUpdate
+	void touch() {
+		this.updatedAt = Instant.now();
+	}
+
+	public UUID getId() {
+		return this.id;
+	}
+
+	public void setId(UUID id) {
+		this.id = id;
+	}
+
+	public String getTenantId() {
+		return this.tenantId;
+	}
+
+	public void setTenantId(String tenantId) {
+		this.tenantId = tenantId;
+	}
+
+	public String getFilename() {
+		return this.filename;
+	}
+
+	public void setFilename(String filename) {
+		this.filename = filename;
+	}
+
+	public String getContentType() {
+		return this.contentType;
+	}
+
+	public void setContentType(String contentType) {
+		this.contentType = contentType;
+	}
+
+	public long getSizeBytes() {
+		return this.sizeBytes;
+	}
+
+	public void setSizeBytes(long sizeBytes) {
+		this.sizeBytes = sizeBytes;
+	}
+
+	public String getContentHash() {
+		return this.contentHash;
+	}
+
+	public void setContentHash(String contentHash) {
+		this.contentHash = contentHash;
+	}
+
+	public String getTitle() {
+		return this.title;
+	}
+
+	public void setTitle(String title) {
+		this.title = title;
+	}
+
+	public Status getStatus() {
+		return this.status;
+	}
+
+	public void setStatus(Status status) {
+		this.status = status;
+	}
+
+	public int getChunkCount() {
+		return this.chunkCount;
+	}
+
+	public void setChunkCount(int chunkCount) {
+		this.chunkCount = chunkCount;
+	}
+
+	public String getErrorMessage() {
+		return this.errorMessage;
+	}
+
+	public void setErrorMessage(String errorMessage) {
+		this.errorMessage = errorMessage;
+	}
+
+	public String getUploadedBy() {
+		return this.uploadedBy;
+	}
+
+	public void setUploadedBy(String uploadedBy) {
+		this.uploadedBy = uploadedBy;
+	}
+
+	public Instant getCreatedAt() {
+		return this.createdAt;
+	}
+
+	public void setCreatedAt(Instant createdAt) {
+		this.createdAt = createdAt;
+	}
+
+	public Instant getUpdatedAt() {
+		return this.updatedAt;
+	}
+
+	public void setUpdatedAt(Instant updatedAt) {
+		this.updatedAt = updatedAt;
+	}
+
+}

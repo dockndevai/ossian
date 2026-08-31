@@ -1,0 +1,107 @@
+server:
+  # 8080 is taken by spring-llm-gateway in local dev; keep them side by side.
+  port: 8081
+
+spring:
+  application:
+    name: openbook
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:openbook}
+    username: ${DB_USER:openbook}
+    password: ${DB_PASSWORD:openbook}
+    hikari:
+      maximum-pool-size: 15
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema. Hibernate must never touch it, or the two disagree silently.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate.jdbc.batch_size: 25
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 30MB
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keycloak realm. Signature, issuer and expiry are validated here; what a token is
+          # allowed to do is decided by roles and the tenant claim.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/openbook}
+
+  ai:
+    openai:
+      # Points at spring-llm-gateway, which is OpenAI-compatible. Swap for Ollama or a cloud
+      # endpoint by changing this one URL; nothing else in the app knows the difference.
+      base-url: ${LLM_BASE_URL:http://localhost:8080}
+      api-key: ${LLM_API_KEY:sk-demo-local-key}
+      chat:
+        options:
+          model: ${LLM_CHAT_MODEL:qwen2.5:0.5b}
+          temperature: 0.1
+      embedding:
+        options:
+          # Must match openbook.vectorstore dimensions below. nomic-embed-text is 768.
+          model: ${LLM_EMBED_MODEL:nomic-embed-text}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        # MUST equal the embedding model's output size. A mismatch fails at insert time with a
+        # dimension error, which is the good case; the bad case is silently poor retrieval.
+        dimensions: ${LLM_EMBED_DIMENSIONS:768}
+
+openbook:
+  ingest:
+    chunk-size: 1200
+    chunk-overlap: 200
+    max-file-size: 26214400
+    embedding-batch-size: 25
+  retrieval:
+    top-k: 6
+    similarity-threshold: 0.5
+    cache-seconds: 300
+  chat:
+    model: ${LLM_CHAT_MODEL:qwen2.5:0.5b}
+    temperature: 0.1
+    max-tokens: 800
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:4173
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: openbook
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    io.github.dockndevai.openbook: INFO
+    org.springframework.ai: INFO

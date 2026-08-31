@@ -1,0 +1,9 @@
+# Convenience profile for running the backend outside Docker while the
+# infrastructure containers are up.  ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+logging:
+  level:
+    io.github.dockndevai.openbook: DEBUG
+    org.springframework.ai.vectorstore: DEBUG
+spring:
+  jpa:
+    show-sql: false
