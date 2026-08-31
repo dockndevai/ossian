@@ -140,6 +140,19 @@ is a model swap that quietly degrades retrieval.
 
 ---
 
+## The login page
+
+Keycloak serves a themed login at `keycloak/themes/ossian`, mounted into the container and set
+on the realm as `loginTheme`. It extends `keycloak.v2` rather than replacing it: Keycloak's
+login covers a long tail of flows — OTP, WebAuthn, recovery codes, consent, expired links — and
+a from-scratch theme quietly breaks the ones nobody tests until a user hits them. Inheriting
+changes only the appearance.
+
+Realm JSON and themes are mounted from separate directories, because `--import-realm` scans its
+directory for realm files and a theme tree living inside it is at best noise.
+
+---
+
 ## Namespaces
 
 A namespace partitions one tenant's corpus. The tenant is the security boundary and comes from
@@ -262,7 +275,7 @@ no LLM is required.
 backend/        Spring Boot service
 frontend/       React 19 + Vite + TypeScript
 clients/java/   client library for feeding a corpus from another service
-keycloak/       realm import — users, roles, tenant claim mapper
+keycloak/       realm import (keycloak/realm) and the login theme (keycloak/themes)
 gateway/        route override mounted into the spring-llm-gateway image
 docs/           sample corpus to ingest
 scripts/        smoke test against a running stack

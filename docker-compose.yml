@@ -52,7 +52,10 @@ services:
     ports:
       - "8180:8080"
     volumes:
-      - ./keycloak:/opt/keycloak/data/import:ro
+      # Import and themes are mounted separately: --import-realm scans its directory for realm
+      # JSON, and a theme tree living inside it is at best noise and at worst a parse attempt.
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+      - ./keycloak/themes:/opt/keycloak/themes:ro
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
       interval: 10s

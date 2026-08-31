@@ -1,0 +1,135 @@
+/*
+ * Ossian login.
+ *
+ * Matches the console: same mark, same palette, same restraint. The point of theming the login
+ * page is continuity — being bounced to a stock identity-provider screen mid-sign-in is the
+ * moment people wonder whether they are still on the right site.
+ *
+ * Written as overrides on top of keycloak.v2's PatternFly layout. The selectors below are the
+ * ones that theme actually uses; they were read out of its stylesheet rather than guessed.
+ */
+
+:root {
+  --ossian-bg: #f7f7f8;
+  --ossian-panel: #ffffff;
+  --ossian-ink: #18181b;
+  --ossian-muted: #71717a;
+  --ossian-line: #e4e4e7;
+  --ossian-accent: #4f46e5;
+  --ossian-accent-ink: #ffffff;
+  --ossian-shadow: 0 10px 30px rgb(0 0 0 / 0.08);
+}
+
+/* Keycloak's default is a full-bleed photograph. A flat ground reads as an application rather
+   than a product page, and keeps the form the only thing competing for attention. */
+.login-pf body {
+  background: var(--ossian-bg) !important;
+  background-image: none !important;
+  color: var(--ossian-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.pf-v5-c-login__container {
+  max-width: 26rem;
+}
+
+/*
+ * The header is the product name. keycloak.v2 sets it uppercase, letter-spaced and in the
+ * light-100 colour, which is written for a dark photographic background and is invisible on a
+ * pale one — hence the explicit colour and the !important to beat its own !important.
+ */
+#kc-header-wrapper {
+  color: var(--ossian-ink) !important;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  padding-top: 84px;
+  position: relative;
+}
+
+/* The mark, above the name. A background image rather than markup, so the theme needs no
+   template override and keeps inheriting every one of Keycloak's flows. */
+#kc-header-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 60px;
+  background: url("../img/logo.svg") no-repeat center / contain;
+}
+
+.pf-v5-c-login__main {
+  background: var(--ossian-panel);
+  border: 1px solid var(--ossian-line);
+  border-radius: 12px;
+  box-shadow: var(--ossian-shadow);
+}
+
+.pf-v5-c-login__main-header h1,
+.pf-v5-c-title {
+  color: var(--ossian-ink);
+  font-size: 18px;
+}
+
+.pf-v5-c-form__label-text,
+.pf-v5-c-form__label {
+  color: var(--ossian-ink);
+  font-weight: 550;
+}
+
+.pf-v5-c-form-control {
+  border-radius: 8px;
+  border: 1px solid var(--ossian-line);
+  background: var(--ossian-bg);
+}
+.pf-v5-c-form-control:focus-within {
+  border-color: var(--ossian-accent);
+  outline: 2px solid color-mix(in srgb, var(--ossian-accent) 22%, transparent);
+  outline-offset: 1px;
+}
+
+.pf-v5-c-button.pf-m-primary {
+  background: var(--ossian-accent);
+  color: var(--ossian-accent-ink);
+  border-radius: 8px;
+  font-weight: 600;
+}
+.pf-v5-c-button.pf-m-primary:hover {
+  background: color-mix(in srgb, var(--ossian-accent) 88%, #000);
+}
+
+.pf-v5-c-button.pf-m-link,
+a {
+  color: var(--ossian-accent);
+}
+
+.pf-v5-c-alert.pf-m-inline {
+  border-radius: 8px;
+}
+
+/* Follows the operating system, like the console does. Someone sent to sign in from a dark
+   console should not be flashbanged on the way. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ossian-bg: #0f0f11;
+    --ossian-panel: #18181b;
+    --ossian-ink: #f4f4f5;
+    --ossian-muted: #a1a1aa;
+    --ossian-line: #27272a;
+    --ossian-accent: #818cf8;
+    --ossian-accent-ink: #14141a;
+    --ossian-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+  }
+
+  .pf-v5-c-form-control,
+  .pf-v5-c-form-control input {
+    color: var(--ossian-ink);
+  }
+  /* PatternFly draws the field underline from its own token, which stays light on dark. */
+  .pf-v5-c-form-control {
+    --pf-v5-c-form-control--BorderBottomColor: var(--ossian-line);
+  }
+}

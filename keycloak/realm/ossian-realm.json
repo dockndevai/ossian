@@ -152,5 +152,7 @@
         "ossian-admin"
       ]
     }
-  ]
+  ],
+  "loginTheme": "ossian",
+  "accountTheme": "keycloak.v3"
 }

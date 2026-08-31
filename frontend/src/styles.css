@@ -264,3 +264,44 @@ tr.clickable:hover { background: var(--bg); }
   margin-bottom: 14px; font-size: 12px; color: var(--muted); }
 .centered .mark { color: var(--accent); line-height: 0; }
 .centered h1 { margin: 6px 0 0; }
+
+/* ---------- landing ---------- */
+.landing { max-width: 860px; margin: 0 auto; padding: 0 24px 72px; }
+.landing-hero { text-align: center; padding: 72px 0 8px; display: flex; flex-direction: column;
+  align-items: center; gap: 10px; }
+.landing-hero .mark { color: var(--accent); line-height: 0; }
+.landing-hero h1 { margin: 4px 0 0; font-size: 38px; letter-spacing: -0.02em; }
+.lede { max-width: 34em; color: var(--muted); font-size: 16px; line-height: 1.6; margin: 0 0 8px; }
+button.big { padding: 11px 22px; font-size: 15px; }
+.landing-section { margin-top: 56px; }
+.landing-section h2 { font-size: 20px; margin-bottom: 14px; }
+
+/* Numbered steps. The counter is drawn rather than listed so it can sit in the margin at a
+   size that reads as a label instead of competing with the heading. */
+.steps { list-style: none; counter-reset: step; padding: 0; margin: 0;
+  display: grid; gap: 18px; }
+.steps li { counter-increment: step; position: relative; padding-left: 44px; }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: 0;
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font-size: 13px; font-weight: 650; }
+.steps strong { display: block; margin-bottom: 2px; }
+.steps p { margin: 0; color: var(--muted); }
+
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+.feature { border: 1px solid var(--line); border-radius: 10px; padding: 15px; background: var(--panel); }
+.feature strong { display: block; margin-bottom: 5px; }
+.feature p { margin: 0; font-size: 13px; }
+.landing-foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+  text-align: center; }
+
+/* ---------- about ---------- */
+.about-hero { display: flex; align-items: center; gap: 18px; }
+.about-hero .mark { color: var(--accent); line-height: 0; flex: none; }
+.about-hero h2 { margin: 0 0 4px; }
+.about-hero p { margin: 0; }
+.card .value.small-value { font-size: 15px; font-weight: 600; word-break: break-word; }
+.behaviours { margin: 8px 0 0; }
+.behaviours dt { font-weight: 650; margin-top: 16px; }
+.behaviours dd { margin: 4px 0 0; color: var(--muted); }
+.links { padding-left: 18px; margin: 8px 0 0; }
+.links li { margin-bottom: 6px; }
