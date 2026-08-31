@@ -49,4 +49,14 @@ public interface DocumentRepository extends JpaRepository<DocumentEntity, UUID> 
 
 	long countByTenantIdAndStatus(String tenantId, DocumentEntity.Status status);
 
+	long countByTenantIdAndNamespaceAndStatus(String tenantId, String namespace, DocumentEntity.Status status);
+
+	@Query("select coalesce(sum(d.chunkCount), 0) from DocumentEntity d "
+			+ "where d.tenantId = ?1 and d.namespace = ?2")
+	long sumChunksByTenantIdAndNamespace(String tenantId, String namespace);
+
+	@Query("select coalesce(sum(d.sizeBytes), 0) from DocumentEntity d "
+			+ "where d.tenantId = ?1 and d.namespace = ?2")
+	long sumBytesByTenantIdAndNamespace(String tenantId, String namespace);
+
 }

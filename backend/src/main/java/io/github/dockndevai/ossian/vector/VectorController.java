@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.dockndevai.ossian.namespace.NamespaceEntity;
 import io.github.dockndevai.ossian.tenant.TenantContext;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -49,7 +50,8 @@ public class VectorController {
 			String excerpt) {
 	}
 
-	public record SearchRequest(@NotBlank @Size(max = 1000) String query, Integer topK) {
+	public record SearchRequest(@NotBlank @Size(max = 1000) String query, Integer topK,
+			@Size(max = 128) String namespace) {
 	}
 
 	public record SearchResult(String query, int dimensions, double queryNorm, List<NeighbourView> neighbours,
@@ -83,7 +85,8 @@ public class VectorController {
 	/** The chunks themselves, optionally narrowed to one document. */
 	@GetMapping("/chunks")
 	public ChunkPage chunks(@RequestParam(required = false) String documentId,
-			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+			@RequestParam(required = false) String namespace, @RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "25") int size) {
 		int limit = Math.min(Math.max(size, 1), 200);
 		int offset = Math.max(page, 0) * limit;
 		String t = this.tenant.tenantId();
@@ -91,6 +94,10 @@ public class VectorController {
 		StringBuilder where = new StringBuilder("where metadata->>'tenant_id' = ?");
 		List<Object> args = new ArrayList<>();
 		args.add(t);
+		if (namespace != null && !namespace.isBlank()) {
+			where.append(" and metadata->>'namespace' = ?");
+			args.add(NamespaceEntity.slug(namespace));
+		}
 		if (documentId != null && !documentId.isBlank()) {
 			where.append(" and metadata->>'document_id' = ?");
 			args.add(documentId);
@@ -126,18 +133,23 @@ public class VectorController {
 		int topK = (request.topK() == null) ? 10 : Math.min(Math.max(request.topK(), 1), 50);
 		float[] vector = this.embeddings.embed(request.query());
 		String literal = toLiteral(vector);
+		// A null namespace matches every namespace: the clause is written so one bound parameter
+		// serves both cases rather than branching the SQL.
+		String ns = (request.namespace() == null || request.namespace().isBlank()) ? null
+				: NamespaceEntity.slug(request.namespace());
 
 		List<NeighbourView> neighbours = this.jdbc.query("""
 				select id::text, content, metadata::text, 1 - (embedding <=> ?::vector) as similarity
 				from vector_store
 				where metadata->>'tenant_id' = ?
+				  and (?::text is null or metadata->>'namespace' = ?)
 				order by embedding <=> ?::vector
 				limit ?
 				""", (rs, i) -> {
 			Map<String, Object> meta = readMetadata(rs.getString(3));
 			return new NeighbourView(rs.getString(1), str(meta.get("document_id")), str(meta.get("filename")),
 					intOrNull(meta.get("chunk_index")), rs.getDouble(4), excerpt(rs.getString(2)));
-		}, literal, this.tenant.tenantId(), literal, topK);
+		}, literal, this.tenant.tenantId(), ns, ns, literal, topK);
 
 		return new SearchResult(request.query(), vector.length, VectorInspection.norm(vector), neighbours,
 				(System.nanoTime() - started) / 1_000_000);
@@ -150,8 +162,10 @@ public class VectorController {
 	 * plot is usually one that covers unrelated topics and would retrieve better split up.
 	 */
 	@GetMapping("/projection")
-	public ProjectionResult projection(@RequestParam(defaultValue = "500") int limit) {
+	public ProjectionResult projection(@RequestParam(defaultValue = "500") int limit,
+			@RequestParam(required = false) String namespace) {
 		int cap = Math.min(Math.max(limit, 1), 2000);
+		String ns = (namespace == null || namespace.isBlank()) ? null : NamespaceEntity.slug(namespace);
 		record Row(String id, String filename, String excerpt, float[] embedding) {
 		}
 
@@ -159,13 +173,14 @@ public class VectorController {
 				select id::text, content, metadata::text, embedding::text
 				from vector_store
 				where metadata->>'tenant_id' = ?
+				  and (?::text is null or metadata->>'namespace' = ?)
 				order by metadata->>'filename', (metadata->>'chunk_index')::int
 				limit ?
 				""", (rs, i) -> {
 			Map<String, Object> meta = readMetadata(rs.getString(3));
 			return new Row(rs.getString(1), str(meta.get("filename")), excerpt(rs.getString(2)),
 					VectorInspection.parse(rs.getString(4)));
-		}, this.tenant.tenantId(), cap);
+		}, this.tenant.tenantId(), ns, ns, cap);
 
 		if (rows.isEmpty()) {
 			return new ProjectionResult(List.of(), 0, 0);

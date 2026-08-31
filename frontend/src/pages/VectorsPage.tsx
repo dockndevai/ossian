@@ -7,6 +7,7 @@ import {
   type ProjectionResult,
   type SearchResult,
 } from "../api/client";
+import { useNamespace } from "../app/NamespaceContext";
 
 /**
  * What the retriever actually sees.
@@ -19,6 +20,7 @@ import {
 export default function VectorsPage() {
   const auth = useAuth();
   const token = auth.user?.access_token;
+  const { current: namespace } = useNamespace();
 
   const [docs, setDocs] = useState<DocumentView[]>([]);
   const [filter, setFilter] = useState<string>("");
@@ -36,9 +38,9 @@ export default function VectorsPage() {
     setError(null);
     try {
       const [page, proj, docPage] = await Promise.all([
-        api.chunks(token, filter || undefined, 0, 100),
-        api.projection(token),
-        api.documents(token, 0),
+        api.chunks(token, filter || undefined, namespace ?? undefined, 0, 100),
+        api.projection(token, namespace ?? undefined),
+        api.documents(token, 0, namespace ?? undefined),
       ]);
       setChunks(page.content);
       setTotal(page.totalElements);
@@ -47,7 +49,13 @@ export default function VectorsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [token, filter]);
+  }, [token, filter, namespace]);
+
+  useEffect(() => {
+    // A document chosen in another namespace is not in this one; keeping it would empty the
+    // table with no visible cause.
+    setFilter("");
+  }, [namespace]);
 
   useEffect(() => {
     void load();
@@ -59,7 +67,7 @@ export default function VectorsPage() {
     setSearching(true);
     setError(null);
     try {
-      setResult(await api.vectorSearch(token, query.trim(), 10));
+      setResult(await api.vectorSearch(token, query.trim(), 10, namespace ?? undefined));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -81,7 +89,8 @@ export default function VectorsPage() {
         <h2>Vector store</h2>
         <p className="muted">
           Every chunk that was embedded, exactly as stored. {total} chunk{total === 1 ? "" : "s"}
-          {projection?.dimensions ? ` at ${projection.dimensions} dimensions` : ""}.
+          {projection?.dimensions ? ` at ${projection.dimensions} dimensions` : ""}
+          {namespace ? ` in ${namespace}` : " across all namespaces"}.
         </p>
 
         {error && <p className="error">{error}</p>}

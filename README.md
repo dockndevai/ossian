@@ -150,6 +150,24 @@ An unknown namespace resolves to the default rather than erroring. The alternati
 silently returning an empty corpus — reads as "my documents are gone" and sends people looking
 in the wrong place.
 
+Not every page is namespace-scoped, and the UI says which. Pages the switcher filters carry a
+dot in the navigation; on the others the switcher greys itself out and says so. A global control
+that silently does nothing on half the app is worse than no control at all.
+
+| Page | Scoped | Why |
+|---|---|---|
+| Notebook | yes | retrieval is filtered to the namespace |
+| Vectors | yes | chunks, search and the projection all narrow |
+| Console | yes | corpus and retrieval stats narrow; jobs stay tenant-wide |
+| Imports | no | the feed records what a pipeline sent across all namespaces |
+| Settings | no | settings are per tenant — one model serves every namespace |
+| API | no | you choose the parameters yourself |
+
+**Tenant is not namespace.** The tenant comes from the `tenant` claim in the token and is the
+security boundary; it is shown in the sidebar as a label, never as a control. A namespace is
+chosen per request and is organisational. In the demo realm `admin` and `user` are in `acme`,
+`other` is in `globex`.
+
 ---
 
 ## Settings

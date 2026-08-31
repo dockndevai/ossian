@@ -3,6 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="description" content="Answers from your own documents, with citations." />
+    <!--
+      Paint the stored theme before the app mounts. Without this the page renders in the light
+      palette for a frame and then repaints — the flash is worst for exactly the people who chose
+      dark, which is the wrong way round.
+    -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("ossian.theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {
+          /* private browsing and blocked site data both throw; the system default is fine */
+        }
+      })();
+    </script>
     <title>Ossian</title>
   </head>
   <body>

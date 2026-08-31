@@ -1,54 +1,32 @@
 import { useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
+import Logo from "./Logo";
 import { useNamespace } from "./NamespaceContext";
+import { ACCENTS, useTheme, type ThemeMode } from "./ThemeContext";
+import { NAV, isScoped } from "./nav";
 
 /**
- * Left navigation, the namespace switcher, and the account strip.
+ * Left navigation, the namespace switcher, theme controls and the account strip.
  *
- * The namespace switcher lives here rather than on each page because it applies to all of them:
- * it is the lens the whole app is looking through. The tenant chip beside it is deliberately
- * not a control — tenancy comes from the token, and making it look adjustable would suggest
- * otherwise.
+ * Two things here are deliberate rather than incidental. The namespace switcher greys itself out
+ * on pages it does not affect, and pages it does affect carry a dot — a global control that
+ * silently does nothing on half the app is worse than no control at all. And the tenant is
+ * labelled and inert: it comes from the token, and making it look adjustable would suggest a
+ * user could change what they are allowed to see.
  */
-
-interface Item {
-  to: string;
-  label: string;
-  hint: string;
-  admin?: boolean;
-}
-
-const ITEMS: { section: string; items: Item[] }[] = [
-  {
-    section: "Work",
-    items: [
-      { to: "/notebook", label: "Notebook", hint: "Ask your sources" },
-      { to: "/events", label: "Imports", hint: "Event-driven ingestion" },
-    ],
-  },
-  {
-    section: "Inspect",
-    items: [
-      { to: "/vectors", label: "Vectors", hint: "What the retriever sees", admin: true },
-      { to: "/admin", label: "Console", hint: "Corpus and retrieval health", admin: true },
-    ],
-  },
-  {
-    section: "Build",
-    items: [
-      { to: "/settings", label: "Settings", hint: "Model, retrieval, ingestion", admin: true },
-      { to: "/explorer", label: "API", hint: "Try endpoints as yourself" },
-    ],
-  },
-];
-
 export default function Shell({ isAdmin, children }: { isAdmin: boolean; children: React.ReactNode }) {
   const auth = useAuth();
+  const location = useLocation();
   const { namespaces, current, setCurrent, create } = useNamespace();
+  const { mode, setMode, accent, setAccent } = useTheme();
+
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const scoped = isScoped(location.pathname);
+  const tenant = (auth.user?.profile as never as { tenant?: string })?.tenant ?? "default";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,15 +44,20 @@ export default function Shell({ isAdmin, children }: { isAdmin: boolean; childre
   return (
     <div className="shell">
       <aside className="nav">
-        <div className="brand">Ossian</div>
+        <div className="brand">
+          <Logo size={26} />
+          <span>Ossian</span>
+        </div>
 
-        <div className="ns">
+        <div className={`ns${scoped ? "" : " inactive"}`}>
           <label className="small muted" htmlFor="ns">
             Namespace
           </label>
           <select
             id="ns"
             value={current ?? ""}
+            disabled={!scoped}
+            title={scoped ? "Filters this page" : "This page is not namespace-scoped"}
             onChange={(e) => setCurrent(e.target.value || null)}
           >
             <option value="">All namespaces</option>
@@ -84,14 +67,10 @@ export default function Shell({ isAdmin, children }: { isAdmin: boolean; childre
               </option>
             ))}
           </select>
+
           {creating ? (
             <form className="ns-new" onSubmit={submit}>
-              <input
-                autoFocus
-                value={name}
-                placeholder="new namespace"
-                onChange={(e) => setName(e.target.value)}
-              />
+              <input autoFocus value={name} placeholder="new namespace" onChange={(e) => setName(e.target.value)} />
               <button className="primary" type="submit">
                 Add
               </button>
@@ -105,10 +84,14 @@ export default function Shell({ isAdmin, children }: { isAdmin: boolean; childre
             </button>
           )}
           {error && <p className="error small">{error}</p>}
+
+          <p className="muted ns-note">
+            {scoped ? "Filters this page." : "Does not apply to this page."}
+          </p>
         </div>
 
         <nav>
-          {ITEMS.map((section) => {
+          {NAV.map((section) => {
             const visible = section.items.filter((i) => !i.admin || isAdmin);
             if (visible.length === 0) return null;
             return (
@@ -118,6 +101,9 @@ export default function Shell({ isAdmin, children }: { isAdmin: boolean; childre
                   <NavLink key={item.to} to={item.to}>
                     <strong>{item.label}</strong>
                     <span className="small muted">{item.hint}</span>
+                    {item.scoped && (
+                      <span className="scoped-dot" title="Filtered by the namespace above" />
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -125,10 +111,35 @@ export default function Shell({ isAdmin, children }: { isAdmin: boolean; childre
           })}
         </nav>
 
+        <div className="theme">
+          <span className="small muted">Theme</span>
+          <div className="seg">
+            {(["system", "light", "dark"] as ThemeMode[]).map((m) => (
+              <button key={m} className={mode === m ? "on" : undefined} onClick={() => setMode(m)}>
+                {m}
+              </button>
+            ))}
+          </div>
+          <div className="swatches">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                className={`swatch${accent === a.id ? " on" : ""}`}
+                title={a.label}
+                aria-label={`${a.label} accent`}
+                style={{ background: a.light }}
+                onClick={() => setAccent(a.id)}
+              />
+            ))}
+          </div>
+        </div>
+
         <div className="account">
-          {/* Not a control: tenancy is decided by the token, not by the UI. */}
-          <span className="chip" title="From your token, not chosen here">
-            {(auth.user?.profile as never as { tenant?: string })?.tenant ?? "default"}
+          {/* Labelled and inert: the tenant comes from the token, and a control here would
+              suggest a user can choose what they are allowed to see. */}
+          <span className="small muted">Tenant</span>
+          <span className="chip" title="From the tenant claim in your token — not chosen here">
+            {tenant}
           </span>
           <span className="small">{auth.user?.profile.preferred_username}</span>
           <button className="link" onClick={() => void auth.signoutRedirect()}>

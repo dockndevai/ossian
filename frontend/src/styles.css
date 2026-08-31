@@ -1,10 +1,36 @@
+/*
+ * Three theme states, not two. An explicit choice stamps data-theme on the root; the default
+ * "system" stamps nothing, so only prefers-color-scheme separates light from dark. Every colour
+ * is defined on bare :root first — a colour whose only definition lives inside a media query
+ * disappears the moment the toggle overrides it.
+ */
 :root {
   --bg: #f7f7f8; --panel: #fff; --ink: #18181b; --muted: #71717a; --line: #e4e4e7;
-  --accent: #4f46e5; --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --code: #f4f4f5;
+  --accent: var(--accent-light); --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --code: #f4f4f5;
+  --shadow: 0 6px 20px rgb(0 0 0 / .10);
+
+  /* The accent is orthogonal to light/dark: it survives switching between them. Each has a
+     separate dark value because a hue that reads as considered on white turns muddy on near
+     black. */
+  --accent-light: #4f46e5; --accent-dark: #818cf8;
 }
+:root[data-accent="teal"]  { --accent-light: #0f766e; --accent-dark: #2dd4bf; }
+:root[data-accent="amber"] { --accent-light: #b45309; --accent-dark: #fbbf24; }
+:root[data-accent="rose"]  { --accent-light: #be123c; --accent-dark: #fb7185; }
+
+/* System dark — applied unless the viewer explicitly chose light. */
 @media (prefers-color-scheme: dark) {
-  :root { --bg:#0f0f11; --panel:#18181b; --ink:#f4f4f5; --muted:#a1a1aa; --line:#27272a;
-          --accent:#818cf8; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --code:#111113; }
+  :root:not([data-theme="light"]) {
+    --bg:#0f0f11; --panel:#18181b; --ink:#f4f4f5; --muted:#a1a1aa; --line:#27272a;
+    --accent: var(--accent-dark); --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --code:#111113;
+    --shadow: 0 6px 20px rgb(0 0 0 / .45);
+  }
+}
+/* Explicit dark — wins in both directions, including on a light system. */
+:root[data-theme="dark"] {
+  --bg:#0f0f11; --panel:#18181b; --ink:#f4f4f5; --muted:#a1a1aa; --line:#27272a;
+  --accent: var(--accent-dark); --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --code:#111113;
+  --shadow: 0 6px 20px rgb(0 0 0 / .45);
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink);
@@ -132,7 +158,7 @@ tr.clickable:hover { background: var(--bg); }
   border-radius: 10px; }
 .scatter circle { cursor: pointer; transition: r .1s, opacity .1s; }
 .scatter-tip { position: absolute; right: 12px; top: 12px; max-width: 320px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 9px; padding: 10px; box-shadow: 0 6px 20px rgb(0 0 0 / .12); }
+  border: 1px solid var(--line); border-radius: 9px; padding: 10px; box-shadow: var(--shadow); }
 .legend { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .card .value.bad { color: var(--bad); }
 .card .value.warn { color: var(--warn); }
@@ -210,3 +236,31 @@ tr.clickable:hover { background: var(--bg); }
   .nav { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
   .api { grid-template-columns: 1fr; }
 }
+
+/* ---------- brand and theme controls ---------- */
+.brand { display: flex; align-items: center; gap: 9px; color: var(--accent); }
+.brand span { color: var(--ink); }
+.theme { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px;
+  border-top: 1px solid var(--line); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; border: none; border-radius: 0; padding: 5px 0; font-size: 12px;
+  background: var(--panel); color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: #fff; }
+.swatches { display: flex; gap: 6px; }
+.swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent;
+  padding: 0; cursor: pointer; }
+.swatch.on { border-color: var(--ink); }
+
+/* ---------- namespace scope cues ---------- */
+.nav a { position: relative; }
+.scoped-dot { position: absolute; right: 8px; top: 10px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--accent); opacity: .85; }
+.nav a.active .scoped-dot { background: #fff; }
+.ns.inactive { opacity: .5; }
+.ns-note { font-size: 11px; line-height: 1.4; }
+.scope-banner { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--panel);
+  margin-bottom: 14px; font-size: 12px; color: var(--muted); }
+.centered .mark { color: var(--accent); line-height: 0; }
+.centered h1 { margin: 6px 0 0; }

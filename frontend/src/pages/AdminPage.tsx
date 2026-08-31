@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { api, type DocumentView } from "../api/client";
+import { useNamespace } from "../app/NamespaceContext";
 
 /**
  * The maintenance view.
@@ -47,6 +48,7 @@ interface Job {
 export default function AdminPage() {
   const auth = useAuth();
   const token = auth.user?.access_token;
+  const { current: namespace } = useNamespace();
 
   const [corpus, setCorpus] = useState<Corpus | null>(null);
   const [retrieval, setRetrieval] = useState<Retrieval | null>(null);
@@ -60,11 +62,11 @@ export default function AdminPage() {
     setError(null);
     try {
       const [c, r, g, j, d] = await Promise.all([
-        api.corpusStats(token),
-        api.retrievalStats(token),
-        api.gaps(token),
+        api.corpusStats(token, namespace ?? undefined),
+        api.retrievalStats(token, namespace ?? undefined),
+        api.gaps(token, namespace ?? undefined),
         api.jobs(token),
-        api.documents(token, 0),
+        api.documents(token, 0, namespace ?? undefined),
       ]);
       setCorpus(c);
       setRetrieval(r);
@@ -74,7 +76,7 @@ export default function AdminPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [token]);
+  }, [token, namespace]);
 
   useEffect(() => {
     void load();
@@ -94,6 +96,12 @@ export default function AdminPage() {
 
   return (
     <div className="stack">
+      <div className="scope-banner">
+        {namespace
+          ? `Showing ${namespace}. Ingestion jobs are listed for the whole tenant.`
+          : "Showing every namespace in this tenant."}
+      </div>
+
       <section className="panel">
         <h2>Corpus</h2>
         {error && <p className="error">{error}</p>}

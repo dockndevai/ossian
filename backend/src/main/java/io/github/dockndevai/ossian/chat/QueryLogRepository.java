@@ -26,4 +26,28 @@ public interface QueryLogRepository extends JpaRepository<QueryLog, UUID> {
 	@Query("select avg(q.topScore) from QueryLog q where q.tenantId = ?1 and q.createdAt > ?2 and q.topScore is not null")
 	Double avgTopScore(String tenantId, Instant since);
 
+	/*
+	 * Namespace-scoped variants.
+	 *
+	 * A question asked without naming a namespace is logged with a null one, and it genuinely
+	 * did search everything — so it belongs in the unscoped totals and in no single namespace's.
+	 * These deliberately match on equality rather than treating null as a wildcard.
+	 */
+
+	long countByTenantIdAndNamespaceAndCreatedAtAfter(String tenantId, String namespace, Instant since);
+
+	long countByTenantIdAndNamespaceAndAnsweredFalseAndCreatedAtAfter(String tenantId, String namespace,
+			Instant since);
+
+	List<QueryLog> findTop50ByTenantIdAndNamespaceAndAnsweredFalseOrderByCreatedAtDesc(String tenantId,
+			String namespace);
+
+	@Query("select avg(q.latencyMs) from QueryLog q "
+			+ "where q.tenantId = ?1 and q.namespace = ?2 and q.createdAt > ?3")
+	Double avgLatency(String tenantId, String namespace, Instant since);
+
+	@Query("select avg(q.topScore) from QueryLog q "
+			+ "where q.tenantId = ?1 and q.namespace = ?2 and q.createdAt > ?3 and q.topScore is not null")
+	Double avgTopScore(String tenantId, String namespace, Instant since);
+
 }

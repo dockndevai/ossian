@@ -13,6 +13,7 @@ import io.github.dockndevai.ossian.document.DocumentRepository;
 import io.github.dockndevai.ossian.ingest.IngestionJob;
 import io.github.dockndevai.ossian.ingest.IngestionJobRepository;
 import io.github.dockndevai.ossian.ingest.IngestionService;
+import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.tenant.TenantContext;
 
 import org.springframework.data.domain.Page;
@@ -69,25 +70,41 @@ public class AdminController {
 
 	private final TenantContext tenant;
 
+	private final NamespaceService namespaces;
+
 	public AdminController(DocumentRepository documents, DocumentContentRepository contents,
 			IngestionJobRepository jobs, QueryLogRepository queryLog, IngestionService ingestion,
-			TenantContext tenant) {
+			TenantContext tenant, NamespaceService namespaces) {
 		this.documents = documents;
 		this.contents = contents;
 		this.jobs = jobs;
 		this.queryLog = queryLog;
 		this.ingestion = ingestion;
 		this.tenant = tenant;
+		this.namespaces = namespaces;
 	}
 
-	/** What the corpus actually contains right now. */
+	/**
+	 * What the corpus actually contains right now, optionally for one namespace.
+	 *
+	 * <p>No namespace means every namespace this tenant has. An absent filter widens within the
+	 * tenant and never past it.
+	 */
 	@GetMapping("/stats/corpus")
-	public CorpusStats corpus() {
+	public CorpusStats corpus(@RequestParam(required = false) String namespace) {
 		String t = this.tenant.tenantId();
-		return new CorpusStats(this.documents.countByTenantId(t),
-				this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.READY),
-				this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.FAILED),
-				this.documents.sumChunksByTenantId(t), this.documents.sumBytesByTenantId(t));
+		if (namespace == null || namespace.isBlank()) {
+			return new CorpusStats(this.documents.countByTenantId(t),
+					this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.READY),
+					this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.FAILED),
+					this.documents.sumChunksByTenantId(t), this.documents.sumBytesByTenantId(t));
+		}
+		String ns = this.namespaces.resolve(namespace);
+		return new CorpusStats(this.documents.countByTenantIdAndNamespace(t, ns),
+				this.documents.countByTenantIdAndNamespaceAndStatus(t, ns, DocumentEntity.Status.READY),
+				this.documents.countByTenantIdAndNamespaceAndStatus(t, ns, DocumentEntity.Status.FAILED),
+				this.documents.sumChunksByTenantIdAndNamespace(t, ns),
+				this.documents.sumBytesByTenantIdAndNamespace(t, ns));
 	}
 
 	/**
@@ -95,23 +112,33 @@ public class AdminController {
 	 * that cannot answer the questions people actually ask is failing regardless of its size.
 	 */
 	@GetMapping("/stats/retrieval")
-	public RetrievalStats retrieval() {
+	public RetrievalStats retrieval(@RequestParam(required = false) String namespace) {
 		String t = this.tenant.tenantId();
 		Instant since = Instant.now().minus(7, ChronoUnit.DAYS);
-		long asked = this.queryLog.countByTenantIdAndCreatedAtAfter(t, since);
-		long unanswered = this.queryLog.countByTenantIdAndAnsweredFalseAndCreatedAtAfter(t, since);
+		if (namespace == null || namespace.isBlank()) {
+			long asked = this.queryLog.countByTenantIdAndCreatedAtAfter(t, since);
+			long unanswered = this.queryLog.countByTenantIdAndAnsweredFalseAndCreatedAtAfter(t, since);
+			Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
+			return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(t, since),
+					this.queryLog.avgTopScore(t, since));
+		}
+		String ns = this.namespaces.resolve(namespace);
+		long asked = this.queryLog.countByTenantIdAndNamespaceAndCreatedAtAfter(t, ns, since);
+		long unanswered = this.queryLog.countByTenantIdAndNamespaceAndAnsweredFalseAndCreatedAtAfter(t, ns, since);
 		Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
-		return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(t, since),
-				this.queryLog.avgTopScore(t, since));
+		return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(t, ns, since),
+				this.queryLog.avgTopScore(t, ns, since));
 	}
 
 	/** Questions the corpus could not answer — the input to deciding what to ingest next. */
 	@GetMapping("/gaps")
-	public List<GapView> gaps() {
-		return this.queryLog.findTop50ByTenantIdAndAnsweredFalseOrderByCreatedAtDesc(this.tenant.tenantId())
-			.stream()
-			.map(GapView::of)
-			.toList();
+	public List<GapView> gaps(@RequestParam(required = false) String namespace) {
+		String t = this.tenant.tenantId();
+		List<QueryLog> rows = (namespace == null || namespace.isBlank())
+				? this.queryLog.findTop50ByTenantIdAndAnsweredFalseOrderByCreatedAtDesc(t)
+				: this.queryLog.findTop50ByTenantIdAndNamespaceAndAnsweredFalseOrderByCreatedAtDesc(t,
+						this.namespaces.resolve(namespace));
+		return rows.stream().map(GapView::of).toList();
 	}
 
 	@GetMapping("/jobs")

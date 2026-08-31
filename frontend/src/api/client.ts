@@ -215,6 +215,11 @@ export interface EventResult {
   message: string | null;
 }
 
+/** Optional ?namespace= — absent means every namespace the tenant has, never more. */
+function ns(namespace?: string) {
+  return namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
+}
+
 export const api = {
   ask: (token: string | undefined, question: string, documentIds?: string[], namespace?: string) =>
     request<AskResponse>(token, "/chat", {
@@ -270,25 +275,25 @@ export const api = {
   deleteDocument: (token: string | undefined, id: string) =>
     request<void>(token, `/documents/${id}`, { method: "DELETE" }),
 
-  corpusStats: (token: string | undefined) =>
+  corpusStats: (token: string | undefined, namespace?: string) =>
     request<{ documents: number; ready: number; failed: number; chunks: number; bytes: number }>(
       token,
-      "/admin/stats/corpus",
+      `/admin/stats/corpus${ns(namespace)}`,
     ),
 
-  retrievalStats: (token: string | undefined) =>
+  retrievalStats: (token: string | undefined, namespace?: string) =>
     request<{
       questionsLast7d: number;
       unansweredLast7d: number;
       answerRate: number | null;
       avgLatencyMs: number | null;
       avgTopScore: number | null;
-    }>(token, "/admin/stats/retrieval"),
+    }>(token, `/admin/stats/retrieval${ns(namespace)}`),
 
-  gaps: (token: string | undefined) =>
+  gaps: (token: string | undefined, namespace?: string) =>
     request<{ question: string; chunksRetrieved: number; topScore: number | null; createdAt: string }[]>(
       token,
-      "/admin/gaps",
+      `/admin/gaps${ns(namespace)}`,
     ),
 
   jobs: (token: string | undefined) =>
@@ -306,18 +311,20 @@ export const api = {
   reindex: (token: string | undefined, id: string) =>
     request<unknown>(token, `/admin/documents/${id}/reindex`, { method: "POST" }),
 
-  chunks: (token: string | undefined, documentId?: string, page = 0, size = 50) =>
+  chunks: (token: string | undefined, documentId?: string, namespace?: string, page = 0, size = 50) =>
     request<Page<ChunkView>>(
       token,
-      `/admin/vectors/chunks?page=${page}&size=${size}${documentId ? `&documentId=${documentId}` : ""}`,
+      `/admin/vectors/chunks?page=${page}&size=${size}` +
+        (documentId ? `&documentId=${encodeURIComponent(documentId)}` : "") +
+        (namespace ? `&namespace=${encodeURIComponent(namespace)}` : ""),
     ),
 
-  vectorSearch: (token: string | undefined, query: string, topK = 10) =>
+  vectorSearch: (token: string | undefined, query: string, topK = 10, namespace?: string) =>
     request<SearchResult>(token, "/admin/vectors/search", {
       method: "POST",
-      body: JSON.stringify({ query, topK }),
+      body: JSON.stringify({ query, topK, namespace }),
     }),
 
-  projection: (token: string | undefined) =>
-    request<ProjectionResult>(token, "/admin/vectors/projection"),
+  projection: (token: string | undefined, namespace?: string) =>
+    request<ProjectionResult>(token, `/admin/vectors/projection${ns(namespace)}`),
 };

@@ -2,6 +2,7 @@ import { useAuth } from "react-oidc-context";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { NamespaceProvider } from "./app/NamespaceContext";
 import Shell from "./app/Shell";
+import Logo from "./app/Logo";
 import NotebookPage from "./pages/NotebookPage";
 import VectorsPage from "./pages/VectorsPage";
 import AdminPage from "./pages/AdminPage";
@@ -27,6 +28,9 @@ export default function App() {
   if (!auth.isAuthenticated) {
     return (
       <div className="centered">
+        <span className="mark">
+          <Logo size={64} />
+        </span>
         <h1>Ossian</h1>
         <p className="muted">Answers from your own documents, with citations.</p>
         <button className="primary" onClick={() => void auth.signinRedirect()}>
