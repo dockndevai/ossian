@@ -2,6 +2,8 @@
 
 *A retrieval system is a weekend to demo and a quarter to operate. This is the quarter.*
 
+![A bar split 10 percent to 90 percent: a small segment labelled "the demo", and a long remainder of ingestion, retrieval, credentials, limits, observability and audit](media/blog-1-banner.png)
+
 ---
 
 Everyone has built the demo. Embed some documents, stuff the nearest chunks into a prompt, get an

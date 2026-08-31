@@ -1,0 +1,62 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1500px; height:750px; background:#f7f7f8; overflow:hidden;
+         font-family:Inter,-apple-system,system-ui,sans-serif; color:#18181b; }
+  .wrap { padding:76px 88px 0; height:100%; display:flex; flex-direction:column; }
+  h1 { font-size:64px; line-height:1.04; letter-spacing:-.032em; font-weight:700; }
+  .sub { margin-top:18px; font-size:25px; color:#71717a; }
+  .sub em { font-style:normal; color:#18181b; font-weight:600; }
+  /* Three cards, deliberately equal: the post's argument is that they are not ranked, they are
+     for different jobs. Only the third carries the accent, and only because it is the subject. */
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; margin-top:56px;
+          min-height:300px; }
+  .card { background:#fff; border:1px solid #e4e4e7; border-radius:14px; padding:28px 26px 26px;
+        display:flex; flex-direction:column; }
+  .card.mine { border-color:#4f46e5; border-width:2px; padding:27px 25px 25px; }
+  .name { font-size:27px; font-weight:700; letter-spacing:-.015em; }
+  .card.mine .name { color:#4f46e5; }
+  .for { margin-top:6px; font-size:14px; font-family:'JetBrains Mono',monospace; color:#a1a1aa;
+         text-transform:uppercase; letter-spacing:.06em; }
+  .line { margin-top:18px; font-size:19.5px; line-height:1.45; color:#3f3f46; }
+  .tags { margin-top:auto; padding-top:20px; border-top:1px solid #f1f1f3; display:flex;
+          flex-wrap:wrap; gap:7px; }
+  .tag { font-size:13.5px; font-family:'JetBrains Mono',monospace; color:#71717a;
+         background:#f7f7f8; border:1px solid #e4e4e7; border-radius:999px; padding:4px 11px; }
+  .card.mine .tag { color:#4f46e5; border-color:#dcd9fb; background:#f4f3ff; }
+  .foot { margin-top:auto; padding:22px 0 54px; display:flex; align-items:center; gap:12px;
+          color:#a1a1aa; font-size:15px; font-family:'JetBrains Mono',monospace; }
+  .foot .dot { width:5px; height:5px; border-radius:50%; background:#d4d4d8; }
+</style>
+<div class="wrap">
+  <h1>Three tools that look alike — and aren’t</h1>
+  <div class="sub">They all answer questions about documents you give them. <em>That is where the similarity ends.</em></div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="name">Gemini Notebook</div>
+      <div class="for">for a person</div>
+      <div class="line">Google’s, free, finished. Nothing to deploy, and nothing to configure.</div>
+      <div class="tags"><span class="tag">no API</span><span class="tag">source caps</span><span class="tag">their servers</span></div>
+    </div>
+    <div class="card">
+      <div class="name">Open Notebook</div>
+      <div class="for">for a private person</div>
+      <div class="line">MIT, self-hosted, 18+ model providers. Or fully local, so nothing leaves the machine.</div>
+      <div class="tags"><span class="tag">REST API</span><span class="tag">podcasts</span><span class="tag">your disk</span></div>
+    </div>
+    <div class="card mine">
+      <div class="name">Ossian</div>
+      <div class="for">for other software</div>
+      <div class="line">Apache-2.0. A corpus an agent can query, and an operator is on call for.</div>
+      <div class="tags"><span class="tag">API keys</span><span class="tag">rate limits</span><span class="tag">audit</span></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>NotebookLM became Gemini Notebook on 16 July 2026</span>
+    <span class="dot"></span>
+    <span>most of the internet hasn’t caught up</span>
+  </div>
+</div>

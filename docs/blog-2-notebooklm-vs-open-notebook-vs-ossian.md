@@ -2,6 +2,8 @@
 
 *They all answer questions about documents you give them. That is where the similarity ends.*
 
+![Three cards: Gemini Notebook for a person, Open Notebook for a private person, Ossian for other software](media/blog-2-banner.png)
+
 ---
 
 Every few months someone asks me which "NotebookLM alternative" to use, and the question is
