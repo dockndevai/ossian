@@ -35,7 +35,7 @@ React 19 + Vite            Spring Boot 3.5                 Postgres 17
 
 The service holds **no upstream model credentials**. It speaks the OpenAI API to
 [spring-llm-gateway](https://github.com/dockndevai/spring-llm-gateway), which owns routing,
-per-tenant token quotas and metering. Point `LLM_BASE_URL` straight at Ollama to cut it out.
+token quotas and metering. Point `LLM_BASE_URL` straight at Ollama to cut it out.
 
 ---
 
@@ -76,14 +76,14 @@ cd frontend && npm install && npm run dev
 
 Open <http://localhost:5173> and sign in. The realm is imported automatically:
 
-| user | password | tenant | roles |
-|---|---|---|---|
-| `admin` | `admin` | acme | user + admin |
-| `user` | `user` | acme | user |
-| `other` | `other` | globex | user + admin |
+| user | password | roles |
+|---|---|---|
+| `admin` | `admin` | user + admin |
+| `user` | `user` | user |
+| `other` | `other` | user + admin |
 
-`other` exists to demonstrate tenant isolation — sign in as it and the corpus is empty, because
-tenancy comes from the token.
+Sign in as `user` to see the console disappear: the admin surface is gated on the
+`ossian-admin` realm role, and the backend enforces that independently of the navigation.
 
 Ports avoid the usual defaults so this runs beside other local services: backend **8081**,
 Postgres **5433**, Keycloak **8180**, Redis **6380**, LLM gateway **8090**, Ollama **11435**.
@@ -105,13 +105,16 @@ rather than merged, so that file restates the chat route too.
 
 ## The parts worth knowing
 
-### Tenancy is a token claim, never a parameter
+### One installation serves one organisation
 
-`TenantContext` reads the `tenant` claim from the validated JWT. Every query, every retrieval
-filter and every stat is scoped by it. There is deliberately no `findById(id)` exposed on the
-document repository — knowing an id must not be enough to read another tenant's document, so
-lookups are always `findByIdAndTenantId`, and a foreign id returns **404 rather than 403** so the
-response doesn't even confirm the document exists.
+There is no tenant column and no tenant claim. The boundary is the deployment: a company runs its
+own Ossian over its own documents, and namespaces partition that corpus so a question can be asked
+of the handbooks without the runbooks answering.
+
+`CallerContext` answers who is making a request, resolving a Keycloak token or an API key to the
+same shape so nothing downstream cares which arrived. The isolation that does exist between
+callers is on credentials rather than people: a key can be confined to one namespace, and a
+missing document returns **404 rather than 403** so the response does not confirm what exists.
 
 ### Retrieval refuses rather than guesses
 
@@ -122,7 +125,7 @@ coverage-gaps screen.
 
 ### Chunk metadata is what makes deletion possible
 
-The vector store has no foreign keys. Every chunk carries `tenant_id` and `document_id` metadata,
+The vector store has no foreign keys. Every chunk carries `document_id` and `namespace` metadata,
 and deleting a document issues a filtered delete against the store. Without that, deleted
 documents would keep answering questions.
 
@@ -159,11 +162,11 @@ curl -X POST localhost:8081/api/chat \
 
 Accepted in `X-API-Key` or as `Authorization: Bearer`. Only the SHA-256 hash is stored and the
 secret is returned once — there is no endpoint that reveals an existing key, because a system
-where an administrator can read out a tenant's credentials is one where whoever reaches the
-administrator can too.
+where an administrator can read out the installation's credentials is one where whoever reaches
+the administrator can too.
 
 A key carries its own roles, usually fewer than the person who issued it: an ingestion pipeline
-needs to write documents, not administer the tenant. It can also be **confined to a namespace**,
+needs to write documents, not administer the installation. It can also be **confined to a namespace**,
 so a leaked pipeline key cannot read the rest of the corpus. Confinement is enforced where the
 namespace is chosen, not at the edge — listing, retrieval, the vector endpoints and the console
 statistics all ask `NamespaceService` for the effective filter rather than reading the request
@@ -173,9 +176,8 @@ and being told nothing looks like it worked.
 
 | | user token | API key |
 |---|---|---|
-| tenant from | `tenant` claim | the key's row |
-| roles from | `realm_access.roles` | the key's roles |
-| namespace | any in the tenant | all, or exactly one |
+| roles from | `realm_access.roles` | the key's own roles |
+| namespace | any | all, or exactly one |
 | revocable | via Keycloak | immediately, and the row is kept |
 
 ---
@@ -245,9 +247,9 @@ directory for realm files and a theme tree living inside it is at best noise.
 
 ## Namespaces
 
-A namespace partitions one tenant's corpus. The tenant is the security boundary and comes from
-the token; a namespace is an organisational one and comes from the request. A user may read
-across their own namespaces and can never read another tenant's, whichever namespace they name.
+A namespace partitions the corpus. It is an organisational boundary rather than a security one:
+a person may read across every namespace, and selecting none searches all of them. The security
+boundary is the deployment, plus whatever a given credential is confined to.
 
 An unknown namespace resolves to the default rather than erroring. The alternative — a typo
 silently returning an empty corpus — reads as "my documents are gone" and sends people looking
@@ -261,24 +263,24 @@ that silently does nothing on half the app is worse than no control at all.
 |---|---|---|
 | Notebook | yes | retrieval is filtered to the namespace |
 | Vectors | yes | chunks, search and the projection all narrow |
-| Console | yes | corpus and retrieval stats narrow; jobs stay tenant-wide |
+| Console | yes | corpus and retrieval stats narrow; jobs stay across all namespaces |
 | Imports | no | the feed records what a pipeline sent across all namespaces |
-| Settings | no | settings are per tenant — one model serves every namespace |
+| Settings | no | settings are installation-wide — one model serves every namespace |
 | API | no | you choose the parameters yourself |
 
-**Tenant is not namespace.** The tenant comes from the `tenant` claim in the token and is the
-security boundary; it is shown in the sidebar as a label, never as a control. A namespace is
-chosen per request and is organisational. In the demo realm `admin` and `user` are in `acme`,
-`other` is in `globex`.
+**One installation, one organisation.** There is no tenant column and no tenant claim: the
+boundary is the deployment. Namespaces partition the corpus so a question can be asked of the
+handbooks without the runbooks answering — they organise, they do not wall off. The isolation
+that does exist between callers is on credentials: an API key can be confined to one namespace,
+a person cannot.
 
 ---
 
 ## Settings
 
 `/api/admin/settings` exposes the model, retrieval and ingestion tunables. `application.yml`
-supplies the default; a tenant override is stored per tenant and shadows it, so changing a
-retrieval threshold needs neither a redeploy nor agreement from every other tenant in the
-process. Clearing a field restores the default rather than setting an empty value.
+supplies the default; a stored override shadows it, so changing a retrieval threshold needs no
+redeploy. Clearing a field restores the default rather than storing an empty value.
 
 Chunk size and overlap apply to documents indexed *afterwards*. Existing chunks keep their old
 shape until reindexed, which is why those two are flagged in the UI.
@@ -299,7 +301,7 @@ curl -X POST http://localhost:8081/api/events/documents \
 
 Three properties follow from that, and they are the design:
 
-- **Idempotent.** `eventId` is caller-assigned and unique per tenant. Redelivery is normal —
+- **Idempotent.** `eventId` is caller-assigned and unique installation-wide. Redelivery is normal —
   brokers promise at-least-once and pipelines crash mid-batch — so a repeat returns the
   original outcome instead of a second document.
 - **Addressed externally.** Documents are keyed by `externalId`, their identity in the source
@@ -357,9 +359,9 @@ OpenAPI at `/swagger-ui.html`, metrics at `/actuator/prometheus`.
 ./mvnw verify
 ```
 
-Integration tests use Testcontainers and **need Docker running** — tenant scoping lives in SQL
-predicates, and a mocked repository would prove nothing about them. Model calls are stubbed, so
-no LLM is required.
+Integration tests use Testcontainers and **need Docker running** — access control and namespace
+scoping live in SQL predicates, and a mocked repository would prove nothing about them. Model
+calls are stubbed, so no LLM is required.
 
 ```
 backend/        Spring Boot service
@@ -382,8 +384,8 @@ gateway has no route for, a realm that did not import.
 ```
 
 It signs in to Keycloak, uploads `docs/samples/`, waits for ingestion, asks five questions —
-four answerable from the corpus and one deliberately not — then checks tenant isolation and
-admin RBAC and prints the console stats. Pass your own files as arguments to use them instead.
+four answerable from the corpus and one deliberately not — then issues a namespace-confined API
+key and checks it is refused elsewhere, checks admin RBAC, and prints the console stats. Pass your own files as arguments to use them instead.
 
 The fifth question matters: an answer to it means grounding has broken, because nothing in the
 corpus mentions it. Watch for `grounded=False` there and `grounded=True` on the rest.

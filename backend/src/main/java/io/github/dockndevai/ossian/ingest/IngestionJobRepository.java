@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface IngestionJobRepository extends JpaRepository<IngestionJob, UUID> {
 
-	Page<IngestionJob> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
+	Page<IngestionJob> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-	long countByTenantIdAndStatus(String tenantId, IngestionJob.Status status);
+	long countByStatus(IngestionJob.Status status);
 
 }

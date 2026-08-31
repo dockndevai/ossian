@@ -16,7 +16,7 @@ import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
 import io.github.dockndevai.ossian.ingest.IngestionService;
 import io.github.dockndevai.ossian.settings.SettingsService;
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,13 +120,13 @@ public class TransformationService {
 
 	private final OssianProperties properties;
 
-	private final TenantContext tenant;
+	private final CallerContext caller;
 
 	private final CacheManager caches;
 
 	public TransformationService(TransformationRepository transformations, InsightRepository insights,
 			DocumentRepository documents, DocumentContentRepository contents, ChatClient.Builder chatClientBuilder,
-			SettingsService settings, OssianProperties properties, TenantContext tenant, CacheManager caches) {
+			SettingsService settings, OssianProperties properties, CallerContext caller, CacheManager caches) {
 		this.transformations = transformations;
 		this.insights = insights;
 		this.documents = documents;
@@ -134,25 +134,23 @@ public class TransformationService {
 		this.chatClient = chatClientBuilder.build();
 		this.settings = settings;
 		this.properties = properties;
-		this.tenant = tenant;
+		this.caller = caller;
 		this.caches = caches;
 	}
 
-	/** This tenant's transformations, seeding the starter set on first use. */
+	/** Every transformation, seeding the starter set on first use. */
 	@Transactional
 	public List<Transformation> list() {
-		String t = this.tenant.tenantId();
-		if (!this.transformations.existsByTenantId(t)) {
-			seed(t);
+		if (!this.transformations.existsByIdNotNull()) {
+			seed();
 		}
-		return this.transformations.findByTenantIdOrderByPositionAscNameAsc(t);
+		return this.transformations.findAllByOrderByPositionAscNameAsc();
 	}
 
-	private void seed(String tenantId) {
+	private void seed() {
 		int position = 0;
 		for (String[] d : DEFAULTS) {
 			Transformation entity = new Transformation();
-			entity.setTenantId(tenantId);
 			entity.setSlug(d[0]);
 			entity.setName(d[1]);
 			entity.setDescription(d[2]);
@@ -160,7 +158,7 @@ public class TransformationService {
 			entity.setPosition(position++);
 			this.transformations.save(entity);
 		}
-		log.info("Seeded {} default transformations for tenant {}", DEFAULTS.size(), tenantId);
+		log.info("Seeded {} default transformations for tenant {}", DEFAULTS.size());
 	}
 
 	@Transactional
@@ -175,15 +173,13 @@ public class TransformationService {
 			throw new IllegalArgumentException("The prompt must include " + CONTENT_TOKEN
 					+ " where the source text should go");
 		}
-		String t = this.tenant.tenantId();
 		Transformation entity = (id == null) ? new Transformation()
-				: this.transformations.findByIdAndTenantId(id, t)
+				: this.transformations.findById(id)
 					.orElseThrow(() -> new IllegalArgumentException("Transformation not found"));
 
-		entity.setTenantId(t);
 		entity.setName((name == null || name.isBlank()) ? "Untitled" : name.trim());
 		if (entity.getSlug() == null) {
-			entity.setSlug(uniqueSlug(t, Transformation.slugify(entity.getName())));
+			entity.setSlug(uniqueSlug(Transformation.slugify(entity.getName())));
 		}
 		entity.setDescription(description);
 		entity.setPrompt(prompt);
@@ -195,10 +191,10 @@ public class TransformationService {
 		return this.transformations.save(entity);
 	}
 
-	private String uniqueSlug(String tenantId, String base) {
+	private String uniqueSlug(String base) {
 		String candidate = base;
 		int suffix = 2;
-		while (this.transformations.findByTenantIdAndSlug(tenantId, candidate).isPresent()) {
+		while (this.transformations.findBySlug(candidate).isPresent()) {
 			candidate = base + "-" + suffix++;
 		}
 		return candidate;
@@ -206,42 +202,41 @@ public class TransformationService {
 
 	@Transactional
 	public void delete(UUID id) {
-		this.transformations.findByIdAndTenantId(id, this.tenant.tenantId()).ifPresent(this.transformations::delete);
+		this.transformations.findById(id).ifPresent(this.transformations::delete);
 	}
 
 	public List<Insight> insightsFor(UUID documentId) {
-		return this.insights.findByTenantIdAndDocumentIdOrderByCreatedAtDesc(this.tenant.tenantId(), documentId);
+		return this.insights.findByDocumentIdOrderByCreatedAtDesc(documentId);
 	}
 
 	@Transactional
 	public void deleteInsight(UUID id) {
-		this.insights.findByIdAndTenantId(id, this.tenant.tenantId()).ifPresent(this.insights::delete);
+		this.insights.findById(id).ifPresent(this.insights::delete);
 	}
 
 	/** Runs one transformation over one document and stores the result. */
 	@Transactional
 	public Insight run(UUID documentId, String slug) {
-		String t = this.tenant.tenantId();
-		DocumentEntity document = this.documents.findByIdAndTenantId(documentId, t)
+		DocumentEntity document = this.documents.findById(documentId)
 			.orElseThrow(() -> new IllegalArgumentException("Document not found"));
-		Transformation transformation = this.transformations.findByTenantIdAndSlug(t, slug)
+		Transformation transformation = this.transformations.findBySlug(slug)
 			.orElseThrow(() -> new IllegalArgumentException("Transformation not found: " + slug));
 
-		return execute(document, transformation, t, this.tenant.preferredUsername());
+		return execute(document, transformation, this.caller.username());
 	}
 
 	/**
 	 * Runs every transformation marked to apply on ingest.
 	 *
-	 * <p>Takes the tenant explicitly: ingestion runs on an async thread where the security
-	 * context is not propagated, so the request-scoped lookup would resolve the wrong tenant.
+	 * <p>Runs on the ingestion thread, where there is no security context — hence the fixed
+	 * actor below rather than a lookup of who is calling.
 	 */
 	@Transactional
-	public void runOnIngest(DocumentEntity document, String tenantId) {
+	public void runOnIngest(DocumentEntity document) {
 		for (Transformation transformation : this.transformations
-			.findByTenantIdAndApplyOnIngestTrueOrderByPositionAsc(tenantId)) {
+			.findByApplyOnIngestTrueOrderByPositionAsc()) {
 			try {
-				execute(document, transformation, tenantId, "ingest");
+				execute(document, transformation, "ingest");
 			}
 			catch (RuntimeException ex) {
 				// One failing transformation must not fail the ingest or the ones after it.
@@ -251,7 +246,7 @@ public class TransformationService {
 		}
 	}
 
-	private Insight execute(DocumentEntity document, Transformation transformation, String tenantId, String actor) {
+	private Insight execute(DocumentEntity document, Transformation transformation, String actor) {
 		byte[] content = this.contents.findById(document.getId())
 			.orElseThrow(() -> new IllegalArgumentException(
 					"The original file is not retained for this document, so it cannot be transformed"))
@@ -264,18 +259,17 @@ public class TransformationService {
 
 		long started = System.nanoTime();
 		OssianProperties.Transform cfg = this.properties.getTransform();
-		String model = this.settings.effectiveFor(tenantId, SettingsService.CHAT_MODEL);
+		String model = this.settings.effective(SettingsService.CHAT_MODEL);
 
 		// Everything that can change the output goes into the key: the source text, the prompt
 		// and the model. Not the document id — the same file uploaded twice under two names
 		// should not be summarised twice. Not the transformation id either, because editing a
 		// prompt must miss and renaming one must not.
 		String cacheKey = cacheKey(text, transformation.getPrompt(), model);
-		Optional<Insight> reusable = reuse(tenantId, cacheKey);
+		Optional<Insight> reusable = reuse(cacheKey);
 		if (reusable.isPresent()) {
 			Insight previous = reusable.get();
 			Insight hit = new Insight();
-			hit.setTenantId(tenantId);
 			hit.setDocumentId(document.getId());
 			hit.setTransformationId(transformation.getId());
 			hit.setTransformationName(transformation.getName());
@@ -296,7 +290,7 @@ public class TransformationService {
 
 		String output;
 		if (windows.size() == 1) {
-			output = call(transformation.getPrompt().replace(CONTENT_TOKEN, windows.get(0)), tenantId, model);
+			output = call(transformation.getPrompt().replace(CONTENT_TOKEN, windows.get(0)), model);
 		}
 		else {
 			// Map: apply the prompt to each window. Reduce: apply it once more to the collected
@@ -305,7 +299,7 @@ public class TransformationService {
 			List<String> parts = new ArrayList<>(windows.size());
 			for (int i = 0; i < windows.size(); i++) {
 				parts.add("--- part %d of %d ---%n%s".formatted(i + 1, windows.size(),
-						call(transformation.getPrompt().replace(CONTENT_TOKEN, windows.get(i)), tenantId, model)));
+						call(transformation.getPrompt().replace(CONTENT_TOKEN, windows.get(i)), model)));
 			}
 			String combined = String.join("\n\n", parts);
 			String reducePrompt = transformation.getPrompt()
@@ -313,11 +307,10 @@ public class TransformationService {
 						+ "applying this same instruction to each part in order. Merge them into one "
 						+ "result that follows the instruction, removing repetition and keeping the "
 						+ "order of the original.\n\n" + combined);
-			output = call(reducePrompt, tenantId, model);
+			output = call(reducePrompt, model);
 		}
 
 		Insight insight = new Insight();
-		insight.setTenantId(tenantId);
 		insight.setDocumentId(document.getId());
 		insight.setTransformationId(transformation.getId());
 		insight.setTransformationName(transformation.getName());
@@ -342,11 +335,11 @@ public class TransformationService {
 	 * transformation, and checking only the table would give up the millisecond path that makes
 	 * repeated requests worth serving at all.
 	 */
-	private Optional<Insight> reuse(String tenantId, String cacheKey) {
+	private Optional<Insight> reuse(String cacheKey) {
 		Cache cache = this.caches.getCache(INSIGHT_CACHE);
 		if (cache != null) {
 			try {
-				String cached = cache.get(tenantId + ':' + cacheKey, String.class);
+				String cached = cache.get(cacheKey, String.class);
 				if (cached != null && !cached.isBlank()) {
 					// Enough of an Insight to copy the answer from. The row that gets saved is
 					// the caller's, not this one.
@@ -361,7 +354,7 @@ public class TransformationService {
 				log.debug("insight cache read failed: {}", ex.toString());
 			}
 		}
-		return this.insights.findFirstByTenantIdAndCacheKeyOrderByCreatedAtDesc(tenantId, cacheKey)
+		return this.insights.findFirstByCacheKeyOrderByCreatedAtDesc(cacheKey)
 			.map(previous -> {
 				remember(cacheKey, previous.getOutput());
 				return previous;
@@ -374,7 +367,7 @@ public class TransformationService {
 			return;
 		}
 		try {
-			cache.put(this.tenant.tenantId() + ':' + cacheKey, output);
+			cache.put(cacheKey, output);
 		}
 		catch (RuntimeException ex) {
 			log.debug("insight cache write failed: {}", ex.toString());
@@ -404,12 +397,12 @@ public class TransformationService {
 		}
 	}
 
-	private String call(String prompt, String tenantId, String model) {
+	private String call(String prompt, String model) {
 		return this.chatClient.prompt()
 			.options(OpenAiChatOptions.builder()
 				.model(model)
-				.temperature(this.settings.effectiveDoubleFor(tenantId, SettingsService.CHAT_TEMPERATURE))
-				.maxTokens(this.settings.effectiveIntFor(tenantId, SettingsService.CHAT_MAX_TOKENS))
+				.temperature(this.settings.effectiveDouble(SettingsService.CHAT_TEMPERATURE))
+				.maxTokens(this.settings.effectiveInt(SettingsService.CHAT_MAX_TOKENS))
 				.build())
 			// No system prompt here. The chat one instructs the model to answer only from
 			// retrieved context and refuse otherwise, which would make it refuse to summarise.

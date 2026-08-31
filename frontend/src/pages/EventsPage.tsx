@@ -77,7 +77,7 @@ export default function EventsPage() {
               placeholder="crm-4172-v2"
               onChange={(e) => setForm({ ...form, eventId: e.target.value })}
             />
-            <span className="muted small">Unique per tenant. This is the idempotency key.</span>
+            <span className="muted small">Must be unique. This is the idempotency key.</span>
           </label>
 
           <label>

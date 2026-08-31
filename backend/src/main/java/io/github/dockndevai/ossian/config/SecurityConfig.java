@@ -4,7 +4,6 @@ import java.util.List;
 
 import io.github.dockndevai.ossian.apikey.ApiKeyAuthenticationFilter;
 import io.github.dockndevai.ossian.apikey.ApiKeyService;
-import io.github.dockndevai.ossian.tenant.TenantContext;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -102,11 +101,6 @@ public class SecurityConfig {
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", config);
 		return source;
-	}
-
-	@Bean
-	TenantContext tenantContext() {
-		return new TenantContext();
 	}
 
 }

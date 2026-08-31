@@ -41,20 +41,6 @@
       },
       "protocolMappers": [
         {
-          "name": "tenant",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-attribute-mapper",
-          "consentRequired": false,
-          "config": {
-            "user.attribute": "tenant",
-            "claim.name": "tenant",
-            "jsonType.label": "String",
-            "id.token.claim": "true",
-            "access.token.claim": "true",
-            "userinfo.token.claim": "true"
-          }
-        },
-        {
           "name": "audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
@@ -88,11 +74,7 @@
       "email": "admin@ossian.local",
       "firstName": "Ada",
       "lastName": "Admin",
-      "attributes": {
-        "tenant": [
-          "acme"
-        ]
-      },
+      "attributes": {},
       "credentials": [
         {
           "type": "password",
@@ -112,11 +94,7 @@
       "email": "user@ossian.local",
       "firstName": "Uma",
       "lastName": "User",
-      "attributes": {
-        "tenant": [
-          "acme"
-        ]
-      },
+      "attributes": {},
       "credentials": [
         {
           "type": "password",
@@ -135,11 +113,7 @@
       "email": "other@ossian.local",
       "firstName": "Otto",
       "lastName": "Othertenant",
-      "attributes": {
-        "tenant": [
-          "globex"
-        ]
-      },
+      "attributes": {},
       "credentials": [
         {
           "type": "password",

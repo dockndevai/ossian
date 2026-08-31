@@ -12,7 +12,7 @@ import io.github.dockndevai.ossian.document.DocumentContentRepository;
 import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -97,11 +97,11 @@ public class EventIngestController {
 
 	private final NamespaceService namespaces;
 
-	private final TenantContext tenant;
+	private final CallerContext tenant;
 
 	public EventIngestController(IngestEventRepository events, DocumentRepository documents,
 			DocumentContentRepository contents, IngestionJobRepository jobs, IngestionService ingestion,
-			NamespaceService namespaces, TenantContext tenant) {
+			NamespaceService namespaces, CallerContext tenant) {
 		this.events = events;
 		this.documents = documents;
 		this.contents = contents;
@@ -147,23 +147,21 @@ public class EventIngestController {
 	public Page<EventView> list(@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "50") int size) {
 		return this.events
-			.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId(), PageRequest.of(page, Math.min(size, 200)))
+			.findAllByOrderByCreatedAtDesc(PageRequest.of(page, Math.min(size, 200)))
 			.map(EventView::of);
 	}
 
 	@Transactional
 	EventResult handle(IngestEventRequest request) {
-		String tenantId = this.tenant.tenantId();
 
 		// Idempotency first, before any work: a redelivery must be cheap as well as harmless.
-		var seen = this.events.findByTenantIdAndEventId(tenantId, request.eventId());
+		var seen = this.events.findByEventId(request.eventId());
 		if (seen.isPresent()) {
 			return new EventResult(request.eventId(), IngestEvent.Status.DUPLICATE.name(), seen.get().getDocumentId(),
 					"Already processed at " + seen.get().getCreatedAt());
 		}
 
 		IngestEvent event = new IngestEvent();
-		event.setTenantId(tenantId);
 		event.setEventId(request.eventId());
 		event.setExternalId(request.externalId());
 		event.setSource(request.source());
@@ -190,8 +188,7 @@ public class EventIngestController {
 	}
 
 	private UUID delete(IngestEvent event) {
-		var existing = this.documents.findByTenantIdAndNamespaceAndExternalId(event.getTenantId(),
-				event.getNamespace(), event.getExternalId());
+		var existing = this.documents.findByNamespaceAndExternalId(event.getNamespace(), event.getExternalId());
 		// A delete for something that was never here is success, not an error: the desired end
 		// state is "absent", and it already holds.
 		existing.ifPresent(this.ingestion::deleteDocument);
@@ -208,7 +205,7 @@ public class EventIngestController {
 				: request.filename();
 
 		DocumentEntity doc = this.documents
-			.findByTenantIdAndNamespaceAndExternalId(event.getTenantId(), event.getNamespace(), event.getExternalId())
+			.findByNamespaceAndExternalId(event.getNamespace(), event.getExternalId())
 			.orElseGet(DocumentEntity::new);
 
 		String hash = IngestionService.hash(content);
@@ -218,7 +215,6 @@ public class EventIngestController {
 			return doc.getId();
 		}
 
-		doc.setTenantId(event.getTenantId());
 		doc.setNamespace(event.getNamespace());
 		doc.setExternalId(event.getExternalId());
 		doc.setSource(request.source());
@@ -234,7 +230,6 @@ public class EventIngestController {
 		this.contents.save(new DocumentContent(doc.getId(), content));
 
 		IngestionJob job = new IngestionJob();
-		job.setTenantId(event.getTenantId());
 		job.setDocumentId(doc.getId());
 		job.setType(replacing ? IngestionJob.Type.REINDEX : IngestionJob.Type.INGEST);
 		job = this.jobs.save(job);

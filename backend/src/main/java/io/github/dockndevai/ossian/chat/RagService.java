@@ -12,7 +12,7 @@ import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.ingest.IngestionService;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.settings.SettingsService;
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -39,7 +39,7 @@ public class RagService {
 
 	private final OssianProperties properties;
 
-	private final TenantContext tenant;
+	private final CallerContext tenant;
 
 	private final QueryLogRepository queryLog;
 
@@ -48,7 +48,7 @@ public class RagService {
 	private final NamespaceService namespaces;
 
 	public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder, OssianProperties properties,
-			TenantContext tenant, QueryLogRepository queryLog, SettingsService settings, NamespaceService namespaces) {
+			CallerContext tenant, QueryLogRepository queryLog, SettingsService settings, NamespaceService namespaces) {
 		this.vectorStore = vectorStore;
 		this.chatClient = chatClientBuilder.build();
 		this.properties = properties;
@@ -58,31 +58,33 @@ public class RagService {
 		this.namespaces = namespaces;
 	}
 
-	/** Retrieves the chunks that should ground an answer, scoped to the tenant. */
+	/** Retrieves the chunks that should ground an answer. */
 	public List<Document> retrieve(String question, List<String> documentIds, String namespace) {
-		// The tenant clause is first and unconditional. Everything after it narrows within the
-		// tenant; nothing can widen past it.
-		StringBuilder filter = new StringBuilder(
-				"%s == '%s'".formatted(IngestionService.META_TENANT, this.tenant.tenantId()));
+		// Namespace and document filters are joined with && as they are added; the first one
+		// therefore has to omit the leading operator, which is what this tracks.
+		StringBuilder filter = new StringBuilder();
 		// Asked of the namespace service rather than taken from the parameter, because a confined
 		// credential has a namespace even when the request names none. Reading the parameter
 		// directly is what let a confined key retrieve the whole corpus.
 		this.namespaces.effectiveFilter(namespace)
-			.ifPresent(ns -> filter.append(" && %s == '%s'".formatted(IngestionService.META_NAMESPACE, ns)));
+			.ifPresent(ns -> append(filter, "%s == '%s'".formatted(IngestionService.META_NAMESPACE, ns)));
 		if (documentIds != null && !documentIds.isEmpty()) {
 			String ids = documentIds.stream().filter(Objects::nonNull).map(id -> "'" + id + "'")
 				.reduce((a, b) -> a + "," + b).orElse("");
 			if (!ids.isBlank()) {
-				filter.append(" && %s in [%s]".formatted(IngestionService.META_DOCUMENT, ids));
+				append(filter, "%s in [%s]".formatted(IngestionService.META_DOCUMENT, ids));
 			}
 		}
-		SearchRequest request = SearchRequest.builder()
+		SearchRequest.Builder request = SearchRequest.builder()
 			.query(question)
 			.topK(this.settings.effectiveInt(SettingsService.RETRIEVAL_TOP_K))
-			.similarityThreshold(this.settings.effectiveDouble(SettingsService.RETRIEVAL_THRESHOLD))
-			.filterExpression(filter.toString())
-			.build();
-		List<Document> hits = this.vectorStore.similaritySearch(request);
+			.similarityThreshold(this.settings.effectiveDouble(SettingsService.RETRIEVAL_THRESHOLD));
+		// Only when there is something to filter on. An empty expression is not "match
+		// everything" to the parser — it is a parse error.
+		if (!filter.isEmpty()) {
+			request.filterExpression(filter.toString());
+		}
+		List<Document> hits = this.vectorStore.similaritySearch(request.build());
 		return (hits == null) ? List.of() : hits;
 	}
 
@@ -200,7 +202,6 @@ public class RagService {
 			Integer promptTokens, Integer completionTokens, String namespace) {
 		try {
 			QueryLog entry = new QueryLog();
-			entry.setTenantId(this.tenant.tenantId());
 			entry.setSubject(this.tenant.subject());
 			entry.setQuestion(question.substring(0, Math.min(question.length(), 2000)));
 			entry.setNamespace(namespace);
@@ -216,6 +217,15 @@ public class RagService {
 			// Telemetry must never break the answer path.
 			log.warn("Could not record query log", ex);
 		}
+	}
+
+
+	/** Joins filter clauses with &&, without a leading operator on the first. */
+	private static void append(StringBuilder filter, String clause) {
+		if (!filter.isEmpty()) {
+			filter.append(" && ");
+		}
+		filter.append(clause);
 	}
 
 }

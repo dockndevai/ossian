@@ -6,7 +6,7 @@ import { useAuth } from "react-oidc-context";
  *
  * Swagger UI is already served at /swagger-ui.html and describes the schema better than this
  * could. What it cannot easily do is send a request as *you*: every call here carries the token
- * from the current session, so what you see is what your own roles and tenant actually return.
+ * from the current session, so what you see is what your own roles actually return.
  * That is the difference between reading that an endpoint is admin-only and watching it 403.
  *
  * The page is routed at /explorer, not /api: the dev server proxies everything under /api to
@@ -43,7 +43,7 @@ const ENDPOINTS: { group: string; items: Endpoint[] }[] = [
     group: "Documents",
     items: [
       { method: "GET", path: "/api/documents", summary: "List documents. Add ?namespace= to narrow." },
-      { method: "GET", path: "/api/namespaces", summary: "Namespaces available to your tenant." },
+      { method: "GET", path: "/api/namespaces", summary: "Namespaces in this installation." },
       {
         method: "POST",
         path: "/api/namespaces",
@@ -164,7 +164,7 @@ export default function ApiPage() {
         <h2>API</h2>
         <p className="muted">
           Every call below is sent with your current token, so the response is what your own roles
-          and tenant return — not what the schema says is possible. The full OpenAPI description
+          return — not what the schema says is possible. The full OpenAPI description
           is at{" "}
           <a href="/swagger-ui.html" target="_blank" rel="noreferrer">
             /swagger-ui.html

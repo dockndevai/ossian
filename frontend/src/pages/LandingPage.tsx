@@ -50,8 +50,8 @@ export default function LandingPage() {
           <li>
             <strong>Retrieve</strong>
             <p>
-              A question is embedded and matched against the corpus, filtered to your tenant and,
-              if you choose, one namespace. Weak matches are discarded rather than passed on.
+              A question is embedded and matched against the corpus, narrowed to one namespace
+              if you choose. Weak matches are discarded rather than passed on.
             </p>
           </li>
           <li>
@@ -71,9 +71,9 @@ export default function LandingPage() {
             An answer is written only from retrieved passages. Ask something the corpus does not
             cover and you get a refusal, not a plausible paragraph.
           </Feature>
-          <Feature title="Tenant isolation">
-            Tenancy comes from a claim in your token, never from a header or a parameter. Every
-            document, chunk and query is filtered by it, so a client cannot name its own tenant.
+          <Feature title="Machine credentials">
+            API keys so an agent can authenticate without a browser. A key carries its own roles
+            and can be confined to one namespace, so a leaked pipeline key cannot read the rest.
           </Feature>
           <Feature title="Namespaces">
             Partition a corpus into slices — handbooks, runbooks, policies — and ask within one
@@ -86,7 +86,7 @@ export default function LandingPage() {
           </Feature>
           <Feature title="Tunable without a redeploy">
             Model, temperature, chunk size, overlap, how many passages and how good a match has to
-            be — all editable per tenant, at runtime.
+            be — all editable at runtime, without a redeploy.
           </Feature>
           <Feature title="Fed by pipelines">
             An event API for CDC streams and webhooks: idempotent on a caller-assigned event id,
@@ -103,7 +103,7 @@ export default function LandingPage() {
           <a href="https://github.com/dockndevai/spring-llm-gateway" target="_blank" rel="noreferrer">
             spring-llm-gateway
           </a>
-          , which owns virtual keys, per-tenant token quotas and usage metering — so Ossian holds
+          , which owns virtual keys, token quotas and usage metering — so Ossian holds
           no upstream model credentials of its own.
         </p>
       </section>

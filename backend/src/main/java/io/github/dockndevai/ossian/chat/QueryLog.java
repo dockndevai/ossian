@@ -23,8 +23,6 @@ public class QueryLog {
 	@GeneratedValue
 	private UUID id;
 
-	@Column(name = "tenant_id", nullable = false)
-	private String tenantId;
 
 	private String subject;
 
@@ -63,13 +61,7 @@ public class QueryLog {
 		this.id = id;
 	}
 
-	public String getTenantId() {
-		return this.tenantId;
-	}
 
-	public void setTenantId(String tenantId) {
-		this.tenantId = tenantId;
-	}
 
 	public String getSubject() {
 		return this.subject;

@@ -98,8 +98,8 @@ export default function AdminPage() {
     <div className="stack">
       <div className="scope-banner">
         {namespace
-          ? `Showing ${namespace}. Ingestion jobs are listed for the whole tenant.`
-          : "Showing every namespace in this tenant."}
+          ? `Showing ${namespace}. Ingestion jobs are listed across all namespaces.`
+          : "Showing every namespace."}
       </div>
 
       <section className="panel">

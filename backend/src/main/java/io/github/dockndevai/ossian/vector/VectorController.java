@@ -8,7 +8,7 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -72,13 +72,13 @@ public class VectorController {
 
 	private final EmbeddingModel embeddings;
 
-	private final TenantContext tenant;
+	private final CallerContext tenant;
 
 	private final ObjectMapper json = new ObjectMapper();
 
 	private final NamespaceService namespaces;
 
-	public VectorController(JdbcTemplate jdbc, EmbeddingModel embeddings, TenantContext tenant, NamespaceService namespaces) {
+	public VectorController(JdbcTemplate jdbc, EmbeddingModel embeddings, CallerContext tenant, NamespaceService namespaces) {
 		this.jdbc = jdbc;
 		this.embeddings = embeddings;
 		this.tenant = tenant;
@@ -92,11 +92,10 @@ public class VectorController {
 			@RequestParam(defaultValue = "25") int size) {
 		int limit = Math.min(Math.max(size, 1), 200);
 		int offset = Math.max(page, 0) * limit;
-		String t = this.tenant.tenantId();
 
-		StringBuilder where = new StringBuilder("where metadata->>'tenant_id' = ?");
+		// Starts matching everything; each optional filter narrows it.
+		StringBuilder where = new StringBuilder("where true");
 		List<Object> args = new ArrayList<>();
-		args.add(t);
 		var confined = this.namespaces.effectiveFilter(namespace);
 		if (confined.isPresent()) {
 			where.append(" and metadata->>'namespace' = ?");
@@ -144,15 +143,14 @@ public class VectorController {
 		List<NeighbourView> neighbours = this.jdbc.query("""
 				select id::text, content, metadata::text, 1 - (embedding <=> ?::vector) as similarity
 				from vector_store
-				where metadata->>'tenant_id' = ?
-				  and (?::text is null or metadata->>'namespace' = ?)
+				where (?::text is null or metadata->>'namespace' = ?)
 				order by embedding <=> ?::vector
 				limit ?
 				""", (rs, i) -> {
 			Map<String, Object> meta = readMetadata(rs.getString(3));
 			return new NeighbourView(rs.getString(1), str(meta.get("document_id")), str(meta.get("filename")),
 					intOrNull(meta.get("chunk_index")), rs.getDouble(4), excerpt(rs.getString(2)));
-		}, literal, this.tenant.tenantId(), ns, ns, literal, topK);
+		}, literal, ns, ns, literal, topK);
 
 		return new SearchResult(request.query(), vector.length, VectorInspection.norm(vector), neighbours,
 				(System.nanoTime() - started) / 1_000_000);
@@ -175,15 +173,14 @@ public class VectorController {
 		List<Row> rows = this.jdbc.query("""
 				select id::text, content, metadata::text, embedding::text
 				from vector_store
-				where metadata->>'tenant_id' = ?
-				  and (?::text is null or metadata->>'namespace' = ?)
+				where (?::text is null or metadata->>'namespace' = ?)
 				order by metadata->>'filename', (metadata->>'chunk_index')::int
 				limit ?
 				""", (rs, i) -> {
 			Map<String, Object> meta = readMetadata(rs.getString(3));
 			return new Row(rs.getString(1), str(meta.get("filename")), excerpt(rs.getString(2)),
 					VectorInspection.parse(rs.getString(4)));
-		}, this.tenant.tenantId(), ns, ns, cap);
+		}, ns, ns, cap);
 
 		if (rows.isEmpty()) {
 			return new ProjectionResult(List.of(), 0, 0);

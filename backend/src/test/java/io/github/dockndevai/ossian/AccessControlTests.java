@@ -28,11 +28,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The security property this whole design rests on: a caller sees only their own tenant's
- * documents, and tenancy comes from the token rather than anything the client can set.
- * <p>
- * Uses a real Postgres with pgvector, because the tenant scoping lives in SQL predicates and a
- * mocked repository would prove nothing about them.
+ * Access control, end to end against a real database.
+ *
+ * <p>This installation serves one organisation, so the boundary is the deployment rather than a
+ * tenant column. What still has to hold is that nothing is readable without authenticating, that
+ * the admin surface needs the admin role, and that a namespace filter actually narrows rather
+ * than merely appearing to.
+ *
+ * <p>Uses a real Postgres with pgvector, because the scoping lives in SQL predicates and a mocked
+ * repository would prove nothing about them.
  */
 @Testcontainers
 @SpringBootTest(properties = {
@@ -46,7 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 		"spring.cache.type=none" })
 @AutoConfigureMockMvc
 @Import(TestAiConfig.class)
-class TenantIsolationTests {
+class AccessControlTests {
 
 	@Container
 	@SuppressWarnings("resource")
@@ -79,13 +83,13 @@ class TenantIsolationTests {
 	@BeforeEach
 	void seed() {
 		this.documents.deleteAll();
-		this.documents.save(doc("acme", "acme-runbook.pdf"));
-		this.documents.save(doc("globex", "globex-secret.pdf"));
+		this.documents.save(doc("default", "runbook.pdf"));
+		this.documents.save(doc("hr", "handbook.pdf"));
 	}
 
-	private DocumentEntity doc(String tenant, String filename) {
+	private DocumentEntity doc(String namespace, String filename) {
 		DocumentEntity d = new DocumentEntity();
-		d.setTenantId(tenant);
+		d.setNamespace(namespace);
 		d.setFilename(filename);
 		d.setSizeBytes(1234);
 		d.setContentHash(UUID.randomUUID().toString().replace("-", "") + "00000000000000000000000000000000");
@@ -99,67 +103,65 @@ class TenantIsolationTests {
 	}
 
 	@Test
-	void aTenantSeesOnlyItsOwnDocuments() throws Exception {
-		this.mvc.perform(get("/api/documents").with(jwt().jwt(j -> j.claim("tenant", "acme"))))
+	void anAuthenticatedCallerSeesTheWholeCorpus() throws Exception {
+		// One organisation, one corpus: namespaces organise it, they do not hide it from its
+		// owner. An absent filter widens to everything the installation holds.
+		this.mvc.perform(get("/api/documents").with(jwt()))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content.length()").value(1))
-			.andExpect(jsonPath("$.content[0].filename").value("acme-runbook.pdf"));
-
-		this.mvc.perform(get("/api/documents").with(jwt().jwt(j -> j.claim("tenant", "globex"))))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content.length()").value(1))
-			.andExpect(jsonPath("$.content[0].filename").value("globex-secret.pdf"));
+			.andExpect(jsonPath("$.totalElements").value(2));
 	}
 
 	@Test
-	void aDocumentIdFromAnotherTenantIs404NotALeak() throws Exception {
-		UUID globexId = this.documents.findByTenantIdAndContentHash("globex",
-				this.documents.findAll().stream()
-					.filter(d -> d.getTenantId().equals("globex")).findFirst().orElseThrow().getContentHash())
-			.orElseThrow().getId();
+	void aNamespaceFilterActuallyNarrows() throws Exception {
+		this.mvc.perform(get("/api/documents").param("namespace", "hr").with(jwt()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalElements").value(1))
+			.andExpect(jsonPath("$.content[0].filename").value("handbook.pdf"));
+	}
 
-		// Knowing the id must not be enough. 404 rather than 403 so the response does not even
-		// confirm that the document exists.
-		this.mvc.perform(get("/api/documents/" + globexId).with(jwt().jwt(j -> j.claim("tenant", "acme"))))
-			.andExpect(status().isNotFound());
+	@Test
+	void anUnknownNamespaceFallsBackRatherThanErroring() throws Exception {
+		// A typo returning an empty corpus reads as "my documents are gone"; the default is the
+		// less alarming and more recoverable answer.
+		this.mvc.perform(get("/api/documents").param("namespace", "nope").with(jwt()))
+			.andExpect(status().isOk());
 	}
 
 	@Test
 	void adminEndpointsRequireTheAdminRole() throws Exception {
-		this.mvc.perform(get("/api/admin/stats/corpus").with(jwt().jwt(j -> j.claim("tenant", "acme"))))
+		this.mvc.perform(get("/api/admin/stats/corpus")
+				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ossian-user"))))
 			.andExpect(status().isForbidden());
 	}
 
 	@Test
 	void anAdminRoleUnlocksTheAdminEndpoints() throws Exception {
-		// jwt() supplies its own authorities and bypasses KeycloakRoleConverter, so the role is
-		// granted explicitly here. The claim-to-authority mapping is covered by
-		// KeycloakRoleConverterTests instead.
-		this.mvc
-			.perform(get("/api/admin/stats/corpus").with(jwt().jwt(j -> j.claim("tenant", "acme"))
-				.authorities(new SimpleGrantedAuthority("ROLE_ossian-admin"))))
+		this.mvc.perform(get("/api/admin/stats/corpus")
+				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ossian-admin"))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.documents").value(2));
+	}
+
+	@Test
+	void statsFollowTheNamespaceFilter() throws Exception {
+		this.mvc.perform(get("/api/admin/stats/corpus").param("namespace", "hr")
+				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ossian-admin"))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.documents").value(1));
 	}
 
 	@Test
-	void aTokenWithNoTenantClaimFallsBackAndSeesNeitherTenant() throws Exception {
-		this.mvc.perform(get("/api/documents").with(jwt()))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content.length()").value(0));
+	void aDocumentThatDoesNotExistIs404() throws Exception {
+		this.mvc.perform(get("/api/documents/" + UUID.randomUUID()).with(jwt()))
+			.andExpect(status().isNotFound());
 	}
 
 	@Test
-	void statsAreScopedToTheCallersTenant() throws Exception {
-		var adminJwt = jwt().jwt(j -> j.claim("tenant", "globex"))
-			.authorities(new SimpleGrantedAuthority("ROLE_ossian-admin"));
-
-		this.mvc.perform(get("/api/admin/stats/corpus").with(adminJwt))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.documents").value(1));
-
-		assertThat(this.documents.countByTenantId("globex")).isEqualTo(1);
-		assertThat(this.documents.count()).isEqualTo(2);
+	void memoryRequiresAuthentication() throws Exception {
+		// Agent memory is as sensitive as the corpus and newer, so it is worth asserting rather
+		// than assuming it inherited the rule.
+		this.mvc.perform(get("/api/memory").param("agentId", "support"))
+			.andExpect(status().isUnauthorized());
 	}
 
 }

@@ -8,10 +8,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface NamespaceRepository extends JpaRepository<NamespaceEntity, UUID> {
 
-	List<NamespaceEntity> findByTenantIdOrderByName(String tenantId);
+	List<NamespaceEntity> findAllByOrderByName();
 
-	Optional<NamespaceEntity> findByTenantIdAndName(String tenantId, String name);
+	Optional<NamespaceEntity> findByName(String name);
 
-	boolean existsByTenantIdAndName(String tenantId, String name);
+	boolean existsByName(String name);
 
 }

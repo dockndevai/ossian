@@ -217,7 +217,7 @@ export interface EventResult {
   message: string | null;
 }
 
-/** Optional ?namespace= — absent means every namespace the tenant has, never more. */
+/** Optional ?namespace= — absent means every namespace. */
 function ns(namespace?: string) {
   return namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
 }

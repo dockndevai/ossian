@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import io.github.dockndevai.ossian.config.OssianProperties;
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,13 +104,13 @@ public class SettingsService {
 		}
 	}
 
-	private final TenantSettingRepository repository;
+	private final SettingRepository repository;
 
 	private final OssianProperties properties;
 
-	private final TenantContext tenant;
+	private final CallerContext tenant;
 
-	public SettingsService(TenantSettingRepository repository, OssianProperties properties, TenantContext tenant) {
+	public SettingsService(SettingRepository repository, OssianProperties properties, CallerContext tenant) {
 		this.repository = repository;
 		this.properties = properties;
 		this.tenant = tenant;
@@ -133,38 +133,21 @@ public class SettingsService {
 	}
 
 	/**
-	 * The value in force for an explicitly named tenant.
+	 * The value in force: the stored override if there is one, otherwise the file default.
 	 *
-	 * <p>Ingestion runs on an {@code @Async} thread, where the security context — and therefore
-	 * {@link TenantContext} — is not propagated. Reading settings there through the request-scoped
-	 * lookup would silently resolve the fallback tenant and apply another tenant's configuration.
-	 * Any caller that is not on a request thread must pass the tenant it already knows.
+	 * <p>Settings are installation-wide, so this is safe to call from a background thread as well
+	 * as a request one — there is no per-caller state to lose.
 	 */
-	public String effectiveFor(String tenantId, String key) {
-		return this.repository.findByTenantIdAndKey(tenantId, key)
-			.map(TenantSetting::getValue)
-			.orElseGet(() -> fileDefault(key));
-	}
-
-	public int effectiveIntFor(String tenantId, String key) {
-		return parse(tenantId, key, Integer::parseInt, () -> Integer.parseInt(fileDefault(key)));
-	}
-
-	public double effectiveDoubleFor(String tenantId, String key) {
-		return parse(tenantId, key, Double::parseDouble, () -> Double.parseDouble(fileDefault(key)));
-	}
-
-	/** The value in force for the tenant on the current request. */
 	public String effective(String key) {
-		return effectiveFor(this.tenant.tenantId(), key);
+		return this.repository.findByKey(key).map(Setting::getValue).orElseGet(() -> fileDefault(key));
 	}
 
 	public int effectiveInt(String key) {
-		return effectiveIntFor(this.tenant.tenantId(), key);
+		return parse(key, Integer::parseInt, () -> Integer.parseInt(fileDefault(key)));
 	}
 
 	public double effectiveDouble(String key) {
-		return effectiveDoubleFor(this.tenant.tenantId(), key);
+		return parse(key, Double::parseDouble, () -> Double.parseDouble(fileDefault(key)));
 	}
 
 	/**
@@ -174,9 +157,8 @@ public class SettingsService {
 	 * should not happen — but a setting read on every request is the wrong place to discover
 	 * that assumption was wrong.
 	 */
-	private <T> T parse(String tenantId, String key, Function<String, T> parser,
-			java.util.function.Supplier<T> fallback) {
-		String raw = effectiveFor(tenantId, key);
+	private <T> T parse(String key, Function<String, T> parser, java.util.function.Supplier<T> fallback) {
+		String raw = effective(key);
 		try {
 			return parser.apply(raw);
 		}
@@ -187,13 +169,13 @@ public class SettingsService {
 
 	/** Every setting with its default, its override if any, and the metadata the UI renders. */
 	public List<SettingView> all() {
-		Map<String, TenantSetting> overrides = new LinkedHashMap<>();
-		for (TenantSetting s : this.repository.findByTenantId(this.tenant.tenantId())) {
+		Map<String, Setting> overrides = new LinkedHashMap<>();
+		for (Setting s : this.repository.findAll()) {
 			overrides.put(s.getKey(), s);
 		}
 		List<SettingView> out = new ArrayList<>(DEFINITIONS.size());
 		for (Definition d : DEFINITIONS) {
-			TenantSetting override = overrides.get(d.key());
+			Setting override = overrides.get(d.key());
 			out.add(new SettingView(d.key(), d.group(), d.label(), d.help(), d.type().name(), d.min(), d.max(),
 					d.requiresReindex(), fileDefault(d.key()),
 					(override == null) ? null : override.getValue(),
@@ -220,15 +202,14 @@ public class SettingsService {
 		if (trimmed.isEmpty()) {
 			// Clearing a field means "go back to the file default" rather than "set it to empty",
 			// which is the only reading that lets someone undo a change they regret.
-			this.repository.deleteByTenantIdAndKey(this.tenant.tenantId(), key);
+			this.repository.deleteByKey(key);
 			return;
 		}
 		validate(d, trimmed);
 
-		TenantSetting entity = this.repository.findByTenantIdAndKey(this.tenant.tenantId(), key)
+		Setting entity = this.repository.findByKey(key)
 			.orElseGet(() -> {
-				TenantSetting created = new TenantSetting();
-				created.setTenantId(this.tenant.tenantId());
+				Setting created = new Setting();
 				created.setKey(key);
 				return created;
 			});
@@ -243,7 +224,7 @@ public class SettingsService {
 		if (!BY_KEY.containsKey(key)) {
 			throw new IllegalArgumentException("Unknown setting: " + key);
 		}
-		this.repository.deleteByTenantIdAndKey(this.tenant.tenantId(), key);
+		this.repository.deleteByKey(key);
 	}
 
 	private static void validate(Definition d, String value) {

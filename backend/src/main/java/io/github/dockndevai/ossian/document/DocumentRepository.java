@@ -15,48 +15,48 @@ import org.springframework.data.jpa.repository.Query;
  */
 public interface DocumentRepository extends JpaRepository<DocumentEntity, UUID> {
 
-	Page<DocumentEntity> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
+	Page<DocumentEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-	Optional<DocumentEntity> findByIdAndTenantId(UUID id, String tenantId);
+	Optional<DocumentEntity> findById(UUID id);
 
-	Optional<DocumentEntity> findByTenantIdAndContentHash(String tenantId, String contentHash);
+	Optional<DocumentEntity> findByContentHash(String contentHash);
 
 	/**
 	 * Deduplication is per namespace, not per tenant: the same file may legitimately be filed in
 	 * two namespaces, and treating that as a duplicate would make one of them silently empty.
 	 */
-	Optional<DocumentEntity> findByTenantIdAndNamespaceAndContentHash(String tenantId, String namespace,
+	Optional<DocumentEntity> findByNamespaceAndContentHash(String namespace,
 			String contentHash);
 
 	/** The key an event-driven importer addresses a document by. */
-	Optional<DocumentEntity> findByTenantIdAndNamespaceAndExternalId(String tenantId, String namespace,
+	Optional<DocumentEntity> findByNamespaceAndExternalId(String namespace,
 			String externalId);
 
-	Page<DocumentEntity> findByTenantIdAndNamespaceOrderByCreatedAtDesc(String tenantId, String namespace,
+	Page<DocumentEntity> findByNamespaceOrderByCreatedAtDesc(String namespace,
 			Pageable pageable);
 
-	long countByTenantIdAndNamespace(String tenantId, String namespace);
+	long countByNamespace(String namespace);
 
-	List<DocumentEntity> findByTenantIdAndStatus(String tenantId, DocumentEntity.Status status);
+	List<DocumentEntity> findByStatus(DocumentEntity.Status status);
 
-	long countByTenantId(String tenantId);
+	long count();
 
-	@Query("select coalesce(sum(d.chunkCount), 0) from DocumentEntity d where d.tenantId = ?1")
-	long sumChunksByTenantId(String tenantId);
+	@Query("select coalesce(sum(d.chunkCount), 0) from DocumentEntity d")
+	long sumChunks();
 
-	@Query("select coalesce(sum(d.sizeBytes), 0) from DocumentEntity d where d.tenantId = ?1")
-	long sumBytesByTenantId(String tenantId);
+	@Query("select coalesce(sum(d.sizeBytes), 0) from DocumentEntity d")
+	long sumBytes();
 
-	long countByTenantIdAndStatus(String tenantId, DocumentEntity.Status status);
+	long countByStatus(DocumentEntity.Status status);
 
-	long countByTenantIdAndNamespaceAndStatus(String tenantId, String namespace, DocumentEntity.Status status);
+	long countByNamespaceAndStatus(String namespace, DocumentEntity.Status status);
 
 	@Query("select coalesce(sum(d.chunkCount), 0) from DocumentEntity d "
-			+ "where d.tenantId = ?1 and d.namespace = ?2")
-	long sumChunksByTenantIdAndNamespace(String tenantId, String namespace);
+			+ "where d.namespace = ?1")
+	long sumChunksByNamespace(String namespace);
 
 	@Query("select coalesce(sum(d.sizeBytes), 0) from DocumentEntity d "
-			+ "where d.tenantId = ?1 and d.namespace = ?2")
-	long sumBytesByTenantIdAndNamespace(String tenantId, String namespace);
+			+ "where d.namespace = ?1")
+	long sumBytesByNamespace(String namespace);
 
 }

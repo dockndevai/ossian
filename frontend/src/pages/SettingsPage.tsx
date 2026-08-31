@@ -3,7 +3,7 @@ import { useAuth } from "react-oidc-context";
 import { api, type SettingView } from "../api/client";
 
 /**
- * Runtime configuration, per tenant.
+ * Runtime configuration.
  *
  * Each field shows the file default beside the value in force, so it is always clear whether
  * you are looking at a deliberate choice or an inherited one. Clearing a field means "go back

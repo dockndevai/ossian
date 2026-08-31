@@ -14,7 +14,7 @@ import jakarta.validation.constraints.Size;
 import io.github.dockndevai.ossian.fetch.UrlFetcher;
 import io.github.dockndevai.ossian.ingest.IngestionService;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -58,7 +58,7 @@ public class DocumentController {
 
 	private final IngestionService ingestion;
 
-	private final TenantContext tenant;
+	private final CallerContext tenant;
 
 	private final OssianProperties properties;
 
@@ -67,7 +67,7 @@ public class DocumentController {
 	private final UrlFetcher fetcher;
 
 	public DocumentController(DocumentRepository documents, DocumentContentRepository contents,
-			IngestionJobRepository jobs, IngestionService ingestion, TenantContext tenant,
+			IngestionJobRepository jobs, IngestionService ingestion, CallerContext tenant,
 			OssianProperties properties, NamespaceService namespaces, UrlFetcher fetcher) {
 		this.documents = documents;
 		this.contents = contents;
@@ -87,9 +87,9 @@ public class DocumentController {
 		// tenant, never past it. A confined credential is the exception: for it there is no such
 		// thing as "no filter", which is why this asks rather than testing the parameter.
 		return this.namespaces.effectiveFilter(namespace)
-			.map(ns -> this.documents.findByTenantIdAndNamespaceOrderByCreatedAtDesc(this.tenant.tenantId(), ns,
+			.map(ns -> this.documents.findByNamespaceOrderByCreatedAtDesc(ns,
 					pageable))
-			.orElseGet(() -> this.documents.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId(), pageable))
+			.orElseGet(() -> this.documents.findAllByOrderByCreatedAtDesc(pageable))
 			.map(DocumentView::of);
 	}
 
@@ -116,7 +116,7 @@ public class DocumentController {
 		String ns = this.namespaces.resolve(namespace);
 
 		// Same bytes, same namespace: return the existing document rather than embedding it twice.
-		var existing = this.documents.findByTenantIdAndNamespaceAndContentHash(this.tenant.tenantId(), ns, hash);
+		var existing = this.documents.findByNamespaceAndContentHash(ns, hash);
 		if (existing.isPresent()) {
 			return ResponseEntity.ok(new UploadResponse(existing.get().getId(), null,
 					existing.get().getStatus().name(), true));
@@ -124,17 +124,15 @@ public class DocumentController {
 
 		DocumentEntity doc = new DocumentEntity();
 		doc.setNamespace(ns);
-		doc.setTenantId(this.tenant.tenantId());
 		doc.setFilename(file.getOriginalFilename() == null ? "upload" : file.getOriginalFilename());
 		doc.setContentType(file.getContentType());
 		doc.setSizeBytes(file.getSize());
 		doc.setContentHash(hash);
-		doc.setUploadedBy(this.tenant.preferredUsername());
+		doc.setUploadedBy(this.tenant.username());
 		doc = this.documents.save(doc);
 		this.contents.save(new DocumentContent(doc.getId(), content));
 
 		IngestionJob job = new IngestionJob();
-		job.setTenantId(this.tenant.tenantId());
 		job.setDocumentId(doc.getId());
 		job.setType(IngestionJob.Type.INGEST);
 		job = this.jobs.save(job);
@@ -174,7 +172,7 @@ public class DocumentController {
 
 		String hash = IngestionService.hash(content);
 		String ns = this.namespaces.resolve(request.namespace());
-		var existing = this.documents.findByTenantIdAndNamespaceAndContentHash(this.tenant.tenantId(), ns, hash);
+		var existing = this.documents.findByNamespaceAndContentHash(ns, hash);
 		if (existing.isPresent()) {
 			return ResponseEntity.ok(new UploadResponse(existing.get().getId(), null,
 					existing.get().getStatus().name(), true));
@@ -185,18 +183,16 @@ public class DocumentController {
 
 		DocumentEntity doc = new DocumentEntity();
 		doc.setNamespace(ns);
-		doc.setTenantId(this.tenant.tenantId());
 		doc.setFilename(name);
 		doc.setContentType(fetched.contentType());
 		doc.setSizeBytes((long) content.length);
 		doc.setContentHash(hash);
 		doc.setSourceUrl(fetched.finalUrl());
-		doc.setUploadedBy(this.tenant.preferredUsername());
+		doc.setUploadedBy(this.tenant.username());
 		doc = this.documents.save(doc);
 		this.contents.save(new DocumentContent(doc.getId(), content));
 
 		IngestionJob job = new IngestionJob();
-		job.setTenantId(this.tenant.tenantId());
 		job.setDocumentId(doc.getId());
 		job.setType(IngestionJob.Type.INGEST);
 		job = this.jobs.save(job);
@@ -214,7 +210,7 @@ public class DocumentController {
 
 	/** Look up by id AND tenant: an id alone must never reach another tenant's document. */
 	private DocumentEntity load(UUID id) {
-		return this.documents.findByIdAndTenantId(id, this.tenant.tenantId())
+		return this.documents.findById(id)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 	}
 

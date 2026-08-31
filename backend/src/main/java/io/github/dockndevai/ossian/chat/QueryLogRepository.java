@@ -11,20 +11,20 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface QueryLogRepository extends JpaRepository<QueryLog, UUID> {
 
-	Page<QueryLog> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
+	Page<QueryLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
 	/** The gap analysis: what people asked that the corpus could not answer. */
-	List<QueryLog> findTop50ByTenantIdAndAnsweredFalseOrderByCreatedAtDesc(String tenantId);
+	List<QueryLog> findTop50ByAnsweredFalseOrderByCreatedAtDesc();
 
-	long countByTenantIdAndCreatedAtAfter(String tenantId, Instant since);
+	long countByCreatedAtAfter(Instant since);
 
-	long countByTenantIdAndAnsweredFalseAndCreatedAtAfter(String tenantId, Instant since);
+	long countByAnsweredFalseAndCreatedAtAfter(Instant since);
 
-	@Query("select avg(q.latencyMs) from QueryLog q where q.tenantId = ?1 and q.createdAt > ?2")
-	Double avgLatency(String tenantId, Instant since);
+	@Query("select avg(q.latencyMs) from QueryLog q where q.createdAt > ?1")
+	Double avgLatency(Instant since);
 
-	@Query("select avg(q.topScore) from QueryLog q where q.tenantId = ?1 and q.createdAt > ?2 and q.topScore is not null")
-	Double avgTopScore(String tenantId, Instant since);
+	@Query("select avg(q.topScore) from QueryLog q where q.createdAt > ?1 and q.topScore is not null")
+	Double avgTopScore(Instant since);
 
 	/*
 	 * Namespace-scoped variants.
@@ -34,20 +34,19 @@ public interface QueryLogRepository extends JpaRepository<QueryLog, UUID> {
 	 * These deliberately match on equality rather than treating null as a wildcard.
 	 */
 
-	long countByTenantIdAndNamespaceAndCreatedAtAfter(String tenantId, String namespace, Instant since);
+	long countByNamespaceAndCreatedAtAfter(String namespace, Instant since);
 
-	long countByTenantIdAndNamespaceAndAnsweredFalseAndCreatedAtAfter(String tenantId, String namespace,
+	long countByNamespaceAndAnsweredFalseAndCreatedAtAfter(String namespace,
 			Instant since);
 
-	List<QueryLog> findTop50ByTenantIdAndNamespaceAndAnsweredFalseOrderByCreatedAtDesc(String tenantId,
-			String namespace);
+	List<QueryLog> findTop50ByNamespaceAndAnsweredFalseOrderByCreatedAtDesc(String namespace);
 
 	@Query("select avg(q.latencyMs) from QueryLog q "
-			+ "where q.tenantId = ?1 and q.namespace = ?2 and q.createdAt > ?3")
-	Double avgLatency(String tenantId, String namespace, Instant since);
+			+ "where q.namespace = ?1 and q.createdAt > ?2")
+	Double avgLatency(String namespace, Instant since);
 
 	@Query("select avg(q.topScore) from QueryLog q "
-			+ "where q.tenantId = ?1 and q.namespace = ?2 and q.createdAt > ?3 and q.topScore is not null")
-	Double avgTopScore(String tenantId, String namespace, Instant since);
+			+ "where q.namespace = ?1 and q.createdAt > ?2 and q.topScore is not null")
+	Double avgTopScore(String namespace, Instant since);
 
 }

@@ -7,7 +7,7 @@ import { api, type NamespaceView } from "../api/client";
  *
  * It is app state rather than a prop because the choice outlives the page: picking a namespace
  * in the notebook and then opening the vector view should not silently reset it to everything.
- * The selection is remembered per browser, not per tenant — the tenant comes from the token and
+ * The selection is remembered per browser —
  * is not the UI's to choose.
  */
 

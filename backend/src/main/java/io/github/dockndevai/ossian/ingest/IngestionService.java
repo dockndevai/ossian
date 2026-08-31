@@ -40,8 +40,6 @@ public class IngestionService {
 	private static final Logger log = LoggerFactory.getLogger(IngestionService.class);
 
 	/** Metadata keys. Must match what {@link io.github.dockndevai.ossian.chat.RagService} filters on. */
-	public static final String META_TENANT = "tenant_id";
-
 	public static final String META_DOCUMENT = "document_id";
 
 	public static final String META_FILENAME = "filename";
@@ -159,21 +157,18 @@ public class IngestionService {
 		List<Document> parsed = reader.get();
 
 		OssianProperties.Ingest cfg = this.properties.getIngest();
-		// Chunking is read from settings rather than straight from the file, so a tenant can tune
-		// it without a redeploy. Changing it only affects documents indexed afterwards; existing
+		// Chunking is read from settings rather than straight from the file, so it can be tuned
+		// without a redeploy. Changing it only affects documents indexed afterwards; existing
 		// chunks stay as they were until reindexed, which is why the setting is flagged as
-		// requiring a reindex in the UI.
-		// The tenant comes from the entity, not from the security context: this runs on an async
-		// thread where the context is not propagated.
-		String tenantId = entity.getTenantId();
+		// requiring a reindex in the UI. Safe to read here despite running on an async thread,
+		// because settings are installation-wide and need no request context.
 		ChunkSplitter splitter = new ChunkSplitter(
-				this.settings.effectiveIntFor(tenantId, SettingsService.INGEST_CHUNK_SIZE),
-				this.settings.effectiveIntFor(tenantId, SettingsService.INGEST_CHUNK_OVERLAP));
+				this.settings.effectiveInt(SettingsService.INGEST_CHUNK_SIZE),
+				this.settings.effectiveInt(SettingsService.INGEST_CHUNK_OVERLAP));
 		List<Document> chunks = splitter.apply(parsed);
 
 		for (int i = 0; i < chunks.size(); i++) {
 			Map<String, Object> meta = chunks.get(i).getMetadata();
-			meta.put(META_TENANT, entity.getTenantId());
 			meta.put(META_DOCUMENT, entity.getId().toString());
 			meta.put(META_FILENAME, entity.getFilename());
 			meta.put(META_CHUNK_INDEX, i);
@@ -194,7 +189,7 @@ public class IngestionService {
 			entity.setTitle(deriveTitle(parsed, filename));
 		}
 		this.documents.save(entity);
-		log.info("Ingested {} ({} chunks) for tenant {}", filename, chunks.size(), entity.getTenantId());
+		log.info("Ingested {} ({} chunks) for tenant {}", filename, chunks.size());
 		return chunks.size();
 	}
 
@@ -211,7 +206,7 @@ public class IngestionService {
 			if (entity != null) {
 				// The tenant is passed explicitly: this runs on an async thread where the
 				// security context is not propagated.
-				this.transformations.getObject().runOnIngest(entity, entity.getTenantId());
+				this.transformations.getObject().runOnIngest(entity);
 			}
 		}
 		catch (RuntimeException ex) {
@@ -234,7 +229,7 @@ public class IngestionService {
 	public void deleteDocument(DocumentEntity entity) {
 		this.vectorStore.delete("%s == '%s'".formatted(META_DOCUMENT, entity.getId()));
 		this.documents.delete(entity);
-		log.info("Deleted document {} and its chunks for tenant {}", entity.getId(), entity.getTenantId());
+		log.info("Deleted document {} and its chunks for tenant {}", entity.getId());
 	}
 
 	/**

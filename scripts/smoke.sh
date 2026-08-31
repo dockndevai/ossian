@@ -29,7 +29,7 @@ python3 - "$TOK" <<'PY'
 import sys, json, base64
 p = sys.argv[1].split('.')[1]; p += '=' * (-len(p) % 4)
 c = json.loads(base64.urlsafe_b64decode(p))
-print(f"   {c.get('preferred_username')}  tenant={c.get('tenant')}  roles={c.get('realm_access',{}).get('roles')}")
+print(f"   {c.get('preferred_username')}  roles={c.get('realm_access',{}).get('roles')}")
 PY
 
 say "2. upload"
@@ -77,13 +77,22 @@ cites = ', '.join('%s (%.2f)' % (c['filename'], c['score']) for c in d['citation
 print('      grounded=%s  cites=%s  %dms\n' % (d['answeredFromContext'], cites, d['latencyMs']))"
 done
 
-say "5. tenant isolation — 'other' lives in a different tenant"
-OTHER=$(token other other)
-curl -sf -H "Authorization: Bearer $OTHER" "$API/api/documents" \
-| python3 -c "import json,sys; print('   documents visible:', json.load(sys.stdin)['totalElements'])"
-curl -sf -X POST "$API/api/chat" -H "Authorization: Bearer $OTHER" -H 'Content-Type: application/json' \
+say "5. a machine credential, confined to one namespace"
+# The isolation that exists in a single-organisation deployment is not between people -- they
+# all work for the same company -- but between credentials. A key issued to one pipeline should
+# not read the rest of the corpus if it leaks.
+KEYJSON=$(curl -sf -X POST "$API/api/admin/api-keys" -H "Authorization: Bearer $TOK" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"smoke-confined","roles":["ossian-user"],"namespace":"default"}')
+KEY=$(printf '%s' "$KEYJSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["secret"])')
+printf '   issued %s\n' "$(printf '%s' "$KEYJSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["key"]["keyPrefix"])')"
+curl -sf -X POST "$API/api/chat" -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
   -d '{"question":"Can we deploy to production on a Friday?"}' \
-| python3 -c "import json,sys; d=json.load(sys.stdin); print('   same question ->', d['answer'][:70]); print('   grounded:', d['answeredFromContext'])"
+| python3 -c "import json,sys; d=json.load(sys.stdin); print('   key can ask its own namespace:', d['answeredFromContext'])"
+printf '   key naming another namespace -> HTTP %s (403 expected)\n' \
+  "$(curl -s -o /dev/null -w '%{http_code}' -H "X-API-Key: $KEY" "$API/api/documents?namespace=hr-policies")"
+printf '   key reaching the admin console -> HTTP %s (403 expected)\n' \
+  "$(curl -s -o /dev/null -w '%{http_code}' -H "X-API-Key: $KEY" "$API/api/admin/stats/corpus")"
 
 say "6. role check — a plain user must not reach the admin console"
 USERTOK=$(token user user)

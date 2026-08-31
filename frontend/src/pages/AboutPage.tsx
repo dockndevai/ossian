@@ -31,7 +31,7 @@ export default function AboutPage() {
     })();
   }, [token]);
 
-  const profile = auth.user?.profile as never as { tenant?: string; realm_access?: { roles?: string[] } };
+  const profile = auth.user?.profile as never as { realm_access?: { roles?: string[] } };
   const roles = profile?.realm_access?.roles?.filter((r) => r.startsWith("ossian-")) ?? [];
 
   return (
@@ -53,15 +53,14 @@ export default function AboutPage() {
         <h2>This session</h2>
         <div className="cards">
           <Fact label="Signed in as" value={auth.user?.profile.preferred_username ?? "—"} />
-          <Fact label="Tenant" value={profile?.tenant ?? "default"} />
           <Fact label="Roles" value={roles.length ? roles.join(", ") : "none"} />
           <Fact label="Documents" value={documents ?? "—"} />
           <Fact label="Namespaces" value={namespaces ?? "—"} />
         </div>
         <p className="muted small">
-          Your tenant comes from the <code>tenant</code> claim in your token — not from anything
-          chosen here. It is the isolation boundary: every document, chunk and query is filtered
-          by it, so no request can reach another tenant's corpus whatever it asks for.
+          This installation serves one organisation. Namespaces partition its corpus so a question
+          can be asked of the handbooks without the runbooks answering; they organise, they do not
+          wall off. The boundary is the deployment.
         </p>
       </section>
 
@@ -81,11 +80,11 @@ export default function AboutPage() {
             checkable rather than merely confident.
           </dd>
 
-          <dt>A namespace narrows; the tenant confines</dt>
+          <dt>A namespace narrows; a key can confine</dt>
           <dd>
-            You may read across your own namespaces freely and can never read another tenant's.
-            Selecting no namespace searches all of yours — an absent filter widens within the
-            tenant, never past it.
+            Selecting no namespace searches all of them. An API key, unlike a person, can be
+            confined to exactly one — so a pipeline credential that leaks reads only what that
+            pipeline was for.
           </dd>
 
           <dt>Chunking changes are not retroactive</dt>

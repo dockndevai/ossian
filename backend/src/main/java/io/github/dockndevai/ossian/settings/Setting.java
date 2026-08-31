@@ -5,25 +5,12 @@ import java.time.Instant;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 
-/** One overridden setting for one tenant. The file supplies the default; this overrides it. */
+/** One overridden setting. The file supplies the default; this overrides it. */
 @Entity
-@Table(name = "tenant_settings")
-@IdClass(TenantSetting.Key.class)
-public class TenantSetting {
-
-	/** Composite key: settings are per tenant, and a tenant never sees another's. */
-	public record Key(String tenantId, String key) implements java.io.Serializable {
-		public Key() {
-			this(null, null);
-		}
-	}
-
-	@Id
-	@Column(name = "tenant_id", nullable = false)
-	private String tenantId;
+@Table(name = "settings")
+public class Setting {
 
 	@Id
 	@Column(name = "key", nullable = false)
@@ -38,13 +25,7 @@ public class TenantSetting {
 	@Column(name = "updated_by")
 	private String updatedBy;
 
-	public String getTenantId() {
-		return this.tenantId;
-	}
 
-	public void setTenantId(String tenantId) {
-		this.tenantId = tenantId;
-	}
 
 	public String getKey() {
 		return this.key;

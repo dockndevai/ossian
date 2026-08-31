@@ -11,9 +11,7 @@ import { NAV, isScoped } from "./nav";
  *
  * Two things here are deliberate rather than incidental. The namespace switcher greys itself out
  * on pages it does not affect, and pages it does affect carry a dot — a global control that
- * silently does nothing on half the app is worse than no control at all. And the tenant is
- * labelled and inert: it comes from the token, and making it look adjustable would suggest a
- * user could change what they are allowed to see.
+ * silently does nothing on half the app is worse than no control at all.
  */
 export default function Shell({ isAdmin, children }: { isAdmin: boolean; children: React.ReactNode }) {
   const auth = useAuth();
@@ -26,7 +24,6 @@ export default function Shell({ isAdmin, children }: { isAdmin: boolean; childre
   const [error, setError] = useState<string | null>(null);
 
   const scoped = isScoped(location.pathname);
-  const tenant = (auth.user?.profile as never as { tenant?: string })?.tenant ?? "default";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -135,12 +132,6 @@ export default function Shell({ isAdmin, children }: { isAdmin: boolean; childre
         </div>
 
         <div className="account">
-          {/* Labelled and inert: the tenant comes from the token, and a control here would
-              suggest a user can choose what they are allowed to see. */}
-          <span className="small muted">Tenant</span>
-          <span className="chip" title="From the tenant claim in your token — not chosen here">
-            {tenant}
-          </span>
           <span className="small">{auth.user?.profile.preferred_username}</span>
           <button className="link" onClick={() => void auth.signoutRedirect()}>
             sign out

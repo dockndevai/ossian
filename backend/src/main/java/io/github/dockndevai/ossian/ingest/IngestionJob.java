@@ -40,8 +40,6 @@ public class IngestionJob {
 	@GeneratedValue
 	private UUID id;
 
-	@Column(name = "tenant_id", nullable = false)
-	private String tenantId;
 
 	@Column(name = "document_id")
 	private UUID documentId;
@@ -106,13 +104,7 @@ public class IngestionJob {
 		this.id = id;
 	}
 
-	public String getTenantId() {
-		return this.tenantId;
-	}
 
-	public void setTenantId(String tenantId) {
-		this.tenantId = tenantId;
-	}
 
 	public UUID getDocumentId() {
 		return this.documentId;

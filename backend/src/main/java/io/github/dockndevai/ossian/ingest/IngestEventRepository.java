@@ -9,8 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface IngestEventRepository extends JpaRepository<IngestEvent, UUID> {
 
-	Optional<IngestEvent> findByTenantIdAndEventId(String tenantId, String eventId);
+	Optional<IngestEvent> findByEventId(String eventId);
 
-	Page<IngestEvent> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
+	Page<IngestEvent> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
 }

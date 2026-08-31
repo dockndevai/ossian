@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,13 +41,13 @@ public class ApiKeyService {
 
 	private final ApiKeyRepository repository;
 
-	private final TenantContext tenant;
+	private final CallerContext caller;
 
 	private final SecureRandom random = new SecureRandom();
 
-	public ApiKeyService(ApiKeyRepository repository, TenantContext tenant) {
+	public ApiKeyService(ApiKeyRepository repository, CallerContext caller) {
 		this.repository = repository;
-		this.tenant = tenant;
+		this.caller = caller;
 	}
 
 	/** A newly issued key. The secret is present here and nowhere else, ever again. */
@@ -61,19 +61,17 @@ public class ApiKeyService {
 		String secret = PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
 
 		ApiKeyEntity entity = new ApiKeyEntity();
-		entity.setTenantId(this.tenant.tenantId());
 		entity.setName(name);
 		entity.setKeyHash(hash(secret));
 		entity.setKeyPrefix(secret.substring(0, Math.min(secret.length(), 12)));
 		entity.setRoles(roles == null || roles.isEmpty() ? "ossian-user" : String.join(",", roles));
 		entity.setNamespace((namespace == null || namespace.isBlank()) ? null : namespace);
-		entity.setCreatedBy(this.tenant.preferredUsername());
+		entity.setCreatedBy(this.caller.username());
 		entity.setExpiresAt(expiresAt);
 
 		ApiKeyEntity saved = this.repository.save(entity);
 		// The name and prefix, never the secret. A key in a log file is a key in everyone's hands.
-		log.info("issued api key '{}' ({}) for tenant {}", saved.getName(), saved.getKeyPrefix(),
-				saved.getTenantId());
+		log.info("issued api key '{}' ({})", saved.getName(), saved.getKeyPrefix());
 		return new Issued(saved, secret);
 	}
 
@@ -116,7 +114,7 @@ public class ApiKeyService {
 	}
 
 	public List<ApiKeyEntity> list() {
-		return this.repository.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId());
+		return this.repository.findAllByOrderByCreatedAtDesc();
 	}
 
 	/**
@@ -125,7 +123,7 @@ public class ApiKeyService {
 	 */
 	@Transactional
 	public boolean revoke(UUID id) {
-		return this.repository.findByIdAndTenantId(id, this.tenant.tenantId()).map(key -> {
+		return this.repository.findById(id).map(key -> {
 			if (key.getRevokedAt() == null) {
 				key.setRevokedAt(Instant.now());
 				this.repository.save(key);

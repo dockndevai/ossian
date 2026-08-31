@@ -34,8 +34,6 @@ public class DocumentEntity {
 	@GeneratedValue
 	private UUID id;
 
-	@Column(name = "tenant_id", nullable = false)
-	private String tenantId;
 
 	@Column(nullable = false)
 	private String filename;
@@ -101,13 +99,7 @@ public class DocumentEntity {
 		this.id = id;
 	}
 
-	public String getTenantId() {
-		return this.tenantId;
-	}
 
-	public void setTenantId(String tenantId) {
-		this.tenantId = tenantId;
-	}
 
 	public String getFilename() {
 		return this.filename;

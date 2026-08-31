@@ -3,7 +3,7 @@ package io.github.dockndevai.ossian.namespace;
 import java.util.List;
 import java.util.Optional;
 
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,9 +16,9 @@ public class NamespaceService {
 
 	private final NamespaceRepository repository;
 
-	private final TenantContext tenant;
+	private final CallerContext tenant;
 
-	public NamespaceService(NamespaceRepository repository, TenantContext tenant) {
+	public NamespaceService(NamespaceRepository repository, CallerContext tenant) {
 		this.repository = repository;
 		this.tenant = tenant;
 	}
@@ -31,20 +31,17 @@ public class NamespaceService {
 	 */
 	@Transactional
 	public List<NamespaceEntity> list() {
-		String t = this.tenant.tenantId();
-		if (!this.repository.existsByTenantIdAndName(t, NamespaceEntity.DEFAULT)) {
+		if (!this.repository.existsByName(NamespaceEntity.DEFAULT)) {
 			create(NamespaceEntity.DEFAULT, "Everything not filed elsewhere");
 		}
-		return this.repository.findByTenantIdOrderByName(t);
+		return this.repository.findAllByOrderByName();
 	}
 
 	@Transactional
 	public NamespaceEntity create(String rawName, String description) {
 		String name = NamespaceEntity.slug(rawName);
-		String t = this.tenant.tenantId();
-		return this.repository.findByTenantIdAndName(t, name).orElseGet(() -> {
+		return this.repository.findByName(name).orElseGet(() -> {
 			NamespaceEntity entity = new NamespaceEntity();
-			entity.setTenantId(t);
 			entity.setName(name);
 			entity.setDescription(description);
 			return this.repository.save(entity);
@@ -75,7 +72,7 @@ public class NamespaceService {
 			return NamespaceEntity.DEFAULT;
 		}
 		String name = NamespaceEntity.slug(requested);
-		return this.repository.existsByTenantIdAndName(this.tenant.tenantId(), name) ? name
+		return this.repository.existsByName(name) ? name
 				: NamespaceEntity.DEFAULT;
 	}
 

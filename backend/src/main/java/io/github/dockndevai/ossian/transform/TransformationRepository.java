@@ -8,14 +8,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TransformationRepository extends JpaRepository<Transformation, UUID> {
 
-	List<Transformation> findByTenantIdOrderByPositionAscNameAsc(String tenantId);
+	List<Transformation> findAllByOrderByPositionAscNameAsc();
 
-	List<Transformation> findByTenantIdAndApplyOnIngestTrueOrderByPositionAsc(String tenantId);
+	List<Transformation> findByApplyOnIngestTrueOrderByPositionAsc();
 
-	Optional<Transformation> findByTenantIdAndSlug(String tenantId, String slug);
+	Optional<Transformation> findBySlug(String slug);
 
-	Optional<Transformation> findByIdAndTenantId(UUID id, String tenantId);
+	Optional<Transformation> findById(UUID id);
 
-	boolean existsByTenantId(String tenantId);
+	boolean existsByIdNotNull();
 
 }

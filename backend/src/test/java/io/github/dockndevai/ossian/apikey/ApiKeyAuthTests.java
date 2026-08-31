@@ -18,7 +18,6 @@ class ApiKeyAuthTests {
 
 	private static ApiKeyEntity key(String roles, String namespace) {
 		ApiKeyEntity entity = new ApiKeyEntity();
-		entity.setTenantId("acme");
 		entity.setName("pipeline");
 		entity.setRoles(roles);
 		entity.setNamespace(namespace);
@@ -84,9 +83,8 @@ class ApiKeyAuthTests {
 	@Test
 	@DisplayName("a confined key names its namespace; an unconfined one does not")
 	void confinementIsOnThePrincipal() {
-		ApiKeyPrincipal confined = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "acme", "pipeline",
-				"hr-policies");
-		ApiKeyPrincipal open = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "acme", "console", null);
+		ApiKeyPrincipal confined = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "pipeline", "hr-policies");
+		ApiKeyPrincipal open = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "console", null);
 
 		assertThat(confined.namespace()).isEqualTo("hr-policies");
 		assertThat(open.namespace()).isNull();

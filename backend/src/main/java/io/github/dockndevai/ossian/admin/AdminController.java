@@ -14,7 +14,7 @@ import io.github.dockndevai.ossian.ingest.IngestionJob;
 import io.github.dockndevai.ossian.ingest.IngestionJobRepository;
 import io.github.dockndevai.ossian.ingest.IngestionService;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
-import io.github.dockndevai.ossian.tenant.TenantContext;
+import io.github.dockndevai.ossian.caller.CallerContext;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -68,13 +68,13 @@ public class AdminController {
 
 	private final IngestionService ingestion;
 
-	private final TenantContext tenant;
+	private final CallerContext tenant;
 
 	private final NamespaceService namespaces;
 
 	public AdminController(DocumentRepository documents, DocumentContentRepository contents,
 			IngestionJobRepository jobs, QueryLogRepository queryLog, IngestionService ingestion,
-			TenantContext tenant, NamespaceService namespaces) {
+			CallerContext tenant, NamespaceService namespaces) {
 		this.documents = documents;
 		this.contents = contents;
 		this.jobs = jobs;
@@ -92,20 +92,19 @@ public class AdminController {
 	 */
 	@GetMapping("/stats/corpus")
 	public CorpusStats corpus(@RequestParam(required = false) String namespace) {
-		String t = this.tenant.tenantId();
 		var scope = this.namespaces.effectiveFilter(namespace);
 		if (scope.isEmpty()) {
-			return new CorpusStats(this.documents.countByTenantId(t),
-					this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.READY),
-					this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.FAILED),
-					this.documents.sumChunksByTenantId(t), this.documents.sumBytesByTenantId(t));
+			return new CorpusStats(this.documents.count(),
+					this.documents.countByStatus(DocumentEntity.Status.READY),
+					this.documents.countByStatus(DocumentEntity.Status.FAILED),
+					this.documents.sumChunks(), this.documents.sumBytes());
 		}
 		String ns = scope.get();
-		return new CorpusStats(this.documents.countByTenantIdAndNamespace(t, ns),
-				this.documents.countByTenantIdAndNamespaceAndStatus(t, ns, DocumentEntity.Status.READY),
-				this.documents.countByTenantIdAndNamespaceAndStatus(t, ns, DocumentEntity.Status.FAILED),
-				this.documents.sumChunksByTenantIdAndNamespace(t, ns),
-				this.documents.sumBytesByTenantIdAndNamespace(t, ns));
+		return new CorpusStats(this.documents.countByNamespace(ns),
+				this.documents.countByNamespaceAndStatus(ns, DocumentEntity.Status.READY),
+				this.documents.countByNamespaceAndStatus(ns, DocumentEntity.Status.FAILED),
+				this.documents.sumChunksByNamespace(ns),
+				this.documents.sumBytesByNamespace(ns));
 	}
 
 	/**
@@ -114,31 +113,29 @@ public class AdminController {
 	 */
 	@GetMapping("/stats/retrieval")
 	public RetrievalStats retrieval(@RequestParam(required = false) String namespace) {
-		String t = this.tenant.tenantId();
 		Instant since = Instant.now().minus(7, ChronoUnit.DAYS);
 		var scope = this.namespaces.effectiveFilter(namespace);
 		if (scope.isEmpty()) {
-			long asked = this.queryLog.countByTenantIdAndCreatedAtAfter(t, since);
-			long unanswered = this.queryLog.countByTenantIdAndAnsweredFalseAndCreatedAtAfter(t, since);
+			long asked = this.queryLog.countByCreatedAtAfter(since);
+			long unanswered = this.queryLog.countByAnsweredFalseAndCreatedAtAfter(since);
 			Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
-			return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(t, since),
-					this.queryLog.avgTopScore(t, since));
+			return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(since),
+					this.queryLog.avgTopScore(since));
 		}
 		String ns = scope.get();
-		long asked = this.queryLog.countByTenantIdAndNamespaceAndCreatedAtAfter(t, ns, since);
-		long unanswered = this.queryLog.countByTenantIdAndNamespaceAndAnsweredFalseAndCreatedAtAfter(t, ns, since);
+		long asked = this.queryLog.countByNamespaceAndCreatedAtAfter(ns, since);
+		long unanswered = this.queryLog.countByNamespaceAndAnsweredFalseAndCreatedAtAfter(ns, since);
 		Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
-		return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(t, ns, since),
-				this.queryLog.avgTopScore(t, ns, since));
+		return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(ns, since),
+				this.queryLog.avgTopScore(ns, since));
 	}
 
 	/** Questions the corpus could not answer — the input to deciding what to ingest next. */
 	@GetMapping("/gaps")
 	public List<GapView> gaps(@RequestParam(required = false) String namespace) {
-		String t = this.tenant.tenantId();
 		List<QueryLog> rows = this.namespaces.effectiveFilter(namespace)
-			.map(ns -> this.queryLog.findTop50ByTenantIdAndNamespaceAndAnsweredFalseOrderByCreatedAtDesc(t, ns))
-			.orElseGet(() -> this.queryLog.findTop50ByTenantIdAndAnsweredFalseOrderByCreatedAtDesc(t));
+			.map(ns -> this.queryLog.findTop50ByNamespaceAndAnsweredFalseOrderByCreatedAtDesc(ns))
+			.orElseGet(() -> this.queryLog.findTop50ByAnsweredFalseOrderByCreatedAtDesc());
 		return rows.stream().map(GapView::of).toList();
 	}
 
@@ -146,7 +143,7 @@ public class AdminController {
 	public Page<JobView> jobs(@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size) {
 		return this.jobs
-			.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId(), PageRequest.of(page, Math.min(size, 100)))
+			.findAllByOrderByCreatedAtDesc(PageRequest.of(page, Math.min(size, 100)))
 			.map(JobView::of);
 	}
 
@@ -157,14 +154,13 @@ public class AdminController {
 	 */
 	@PostMapping("/documents/{id}/reindex")
 	public JobView reindex(@PathVariable UUID id) {
-		DocumentEntity doc = this.documents.findByIdAndTenantId(id, this.tenant.tenantId())
+		DocumentEntity doc = this.documents.findById(id)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 		var content = this.contents.findById(id)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
 					"Original content is not retained for this document; re-upload it instead"));
 
 		IngestionJob job = new IngestionJob();
-		job.setTenantId(this.tenant.tenantId());
 		job.setDocumentId(id);
 		job.setType(IngestionJob.Type.REINDEX);
 		job = this.jobs.save(job);

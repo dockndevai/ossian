@@ -29,8 +29,6 @@ public class NamespaceEntity {
 	@GeneratedValue
 	private UUID id;
 
-	@Column(name = "tenant_id", nullable = false)
-	private String tenantId;
 
 	@Column(nullable = false)
 	private String name;
@@ -65,13 +63,7 @@ public class NamespaceEntity {
 		this.id = id;
 	}
 
-	public String getTenantId() {
-		return this.tenantId;
-	}
 
-	public void setTenantId(String tenantId) {
-		this.tenantId = tenantId;
-	}
 
 	public String getName() {
 		return this.name;

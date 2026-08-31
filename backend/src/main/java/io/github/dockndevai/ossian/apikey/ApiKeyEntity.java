@@ -20,8 +20,6 @@ public class ApiKeyEntity {
 	@GeneratedValue
 	private UUID id;
 
-	@Column(name = "tenant_id", nullable = false)
-	private String tenantId;
 
 	@Column(nullable = false)
 	private String name;
@@ -75,13 +73,7 @@ public class ApiKeyEntity {
 		return this.id;
 	}
 
-	public String getTenantId() {
-		return this.tenantId;
-	}
 
-	public void setTenantId(String tenantId) {
-		this.tenantId = tenantId;
-	}
 
 	public String getName() {
 		return this.name;

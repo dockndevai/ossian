@@ -8,11 +8,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface InsightRepository extends JpaRepository<Insight, UUID> {
 
-	List<Insight> findByTenantIdAndDocumentIdOrderByCreatedAtDesc(String tenantId, UUID documentId);
+	List<Insight> findByDocumentIdOrderByCreatedAtDesc(UUID documentId);
 
-	List<Insight> findTop100ByTenantIdOrderByCreatedAtDesc(String tenantId);
+	List<Insight> findTop100ByOrderByCreatedAtDesc();
 
-	Optional<Insight> findByIdAndTenantId(UUID id, String tenantId);
+	Optional<Insight> findById(UUID id);
 
 	/**
 	 * The most recent output produced from exactly these inputs.
@@ -21,6 +21,6 @@ public interface InsightRepository extends JpaRepository<Insight, UUID> {
 	 * is a row that does not, so an identical request stays cheap indefinitely rather than only
 	 * until the next restart.
 	 */
-	Optional<Insight> findFirstByTenantIdAndCacheKeyOrderByCreatedAtDesc(String tenantId, String cacheKey);
+	Optional<Insight> findFirstByCacheKeyOrderByCreatedAtDesc(String cacheKey);
 
 }

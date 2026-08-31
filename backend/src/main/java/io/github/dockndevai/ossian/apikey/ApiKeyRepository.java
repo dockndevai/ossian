@@ -10,8 +10,8 @@ public interface ApiKeyRepository extends JpaRepository<ApiKeyEntity, UUID> {
 
 	Optional<ApiKeyEntity> findByKeyHash(String keyHash);
 
-	List<ApiKeyEntity> findByTenantIdOrderByCreatedAtDesc(String tenantId);
+	List<ApiKeyEntity> findAllByOrderByCreatedAtDesc();
 
-	Optional<ApiKeyEntity> findByIdAndTenantId(UUID id, String tenantId);
+	Optional<ApiKeyEntity> findById(UUID id);
 
 }

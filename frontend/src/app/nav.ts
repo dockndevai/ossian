@@ -34,7 +34,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "Build",
     items: [
-      // Settings are per tenant, not per namespace: one model and one threshold serve them all.
+      // Settings are installation-wide: one model and one threshold serve every namespace.
       { to: "/settings", label: "Settings", hint: "Model, retrieval, ingestion", admin: true, scoped: false },
       { to: "/explorer", label: "API", hint: "Try endpoints as yourself", scoped: false },
       { to: "/about", label: "About", hint: "What this is, and how it behaves", scoped: false },
