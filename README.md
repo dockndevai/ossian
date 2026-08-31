@@ -140,6 +140,56 @@ is a model swap that quietly degrades retrieval.
 
 ---
 
+## Caching
+
+Three caches, with different lifetimes because what makes a hit stale differs.
+
+| Cache | Keyed on | Held | Why that long |
+|---|---|---|---|
+| `embeddings` | text + model | 30 days | embedding is deterministic; a hit can never be stale |
+| `insights` | source text + prompt + model | 1 day, and in the database forever | same inputs, same output — and the most expensive thing here to recompute |
+| `retrieval` | question + scope | seconds | the only one the corpus invalidates underneath |
+
+Transformation output is cached in two tiers. Redis is fast and forgettable; the insights table
+is slower and permanent. Redis alone would re-run every transformation after a restart, and the
+table alone would give up the millisecond path that makes repeated requests worth serving.
+
+A cached result is reported as cached, never presented as fresh — otherwise someone editing a
+prompt cannot tell whether the output in front of them reflects the edit. Measured on this
+corpus: a first run of `summary` took 46.7 s, and identical repeats came back in 2–14 ms.
+
+Editing a prompt changes the key rather than needing an eviction, because the prompt is part of
+it. Renaming a transformation does not.
+
+The embedding cache is applied by a bean post-processor rather than a `@Bean` with
+`@ConditionalOnBean`. That condition is evaluated while user configuration is parsed, before the
+AI auto-configuration has registered the model it asks about, so it never matches and the cache
+is silently absent — embeddings simply get recomputed forever. It fails by working, which is why
+`CachingEmbeddingModelTests` asserts on the number of calls that reach the model rather than on
+the answers.
+
+---
+
+## Sources from a URL
+
+```bash
+curl -X POST localhost:8081/api/documents/url \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com","namespace":"default"}'
+```
+
+The fetch runs as this server, from inside its network, so the address is checked before a socket
+is opened and again after every redirect — a public URL that redirects to `169.254.169.254` would
+otherwise defeat a check done only on the original. Loopback, private, link-local, unique-local,
+carrier-grade NAT and multicast addresses are all refused, and only `http` and `https` are
+accepted. The body is read against a hard cap rather than trusting `Content-Length`.
+
+`ossian.fetch.allow-private-addresses` turns the check off for reaching an internal wiki from a
+laptop. It is off by default and should stay off anywhere the service is reachable by someone you
+would not hand a shell to.
+
+---
+
 ## The login page
 
 Keycloak serves a themed login at `keycloak/themes/ossian`, mounted into the container and set

@@ -305,3 +305,19 @@ button.big { padding: 11px 22px; font-size: 15px; }
 .behaviours dd { margin: 4px 0 0; color: var(--muted); }
 .links { padding-left: 18px; margin: 8px 0 0; }
 .links li { margin-bottom: 6px; }
+
+/* ---------- url sources and the studio ---------- */
+.url-add { display: flex; gap: 6px; margin-top: 8px; }
+.url-add input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; font-size: 13px; }
+.url-add button { padding: 7px 12px; font-size: 13px; }
+a.chip { text-decoration: none; }
+.studio { display: flex; flex-direction: column; gap: 10px; }
+.transform-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.transform-buttons button { font-size: 12px; padding: 5px 10px; }
+.insights { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 8px; }
+.insights > li { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.insight-head { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+  border: none; border-radius: 0; background: var(--bg); padding: 8px 10px; }
+.insight-body { padding: 4px 10px 10px; }
+.insight-body .passage { white-space: pre-wrap; font-size: 13px; }

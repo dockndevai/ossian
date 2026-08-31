@@ -8,6 +8,10 @@ import java.util.UUID;
 import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.ingest.IngestionJob;
 import io.github.dockndevai.ossian.ingest.IngestionJobRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import io.github.dockndevai.ossian.fetch.UrlFetcher;
 import io.github.dockndevai.ossian.ingest.IngestionService;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.tenant.TenantContext;
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,12 +38,12 @@ public class DocumentController {
 
 	public record DocumentView(UUID id, String filename, String title, String contentType, long sizeBytes,
 			String status, int chunkCount, String errorMessage, String uploadedBy, String namespace,
-			String externalId, String source, Instant createdAt) {
+			String externalId, String source, String sourceUrl, Instant createdAt) {
 
 		static DocumentView of(DocumentEntity d) {
 			return new DocumentView(d.getId(), d.getFilename(), d.getTitle(), d.getContentType(), d.getSizeBytes(),
 					d.getStatus().name(), d.getChunkCount(), d.getErrorMessage(), d.getUploadedBy(),
-					d.getNamespace(), d.getExternalId(), d.getSource(), d.getCreatedAt());
+					d.getNamespace(), d.getExternalId(), d.getSource(), d.getSourceUrl(), d.getCreatedAt());
 		}
 	}
 
@@ -59,9 +64,11 @@ public class DocumentController {
 
 	private final NamespaceService namespaces;
 
+	private final UrlFetcher fetcher;
+
 	public DocumentController(DocumentRepository documents, DocumentContentRepository contents,
 			IngestionJobRepository jobs, IngestionService ingestion, TenantContext tenant,
-			OssianProperties properties, NamespaceService namespaces) {
+			OssianProperties properties, NamespaceService namespaces, UrlFetcher fetcher) {
 		this.documents = documents;
 		this.contents = contents;
 		this.jobs = jobs;
@@ -69,6 +76,7 @@ public class DocumentController {
 		this.tenant = tenant;
 		this.properties = properties;
 		this.namespaces = namespaces;
+		this.fetcher = fetcher;
 	}
 
 	@GetMapping
@@ -120,6 +128,68 @@ public class DocumentController {
 		doc.setContentType(file.getContentType());
 		doc.setSizeBytes(file.getSize());
 		doc.setContentHash(hash);
+		doc.setUploadedBy(this.tenant.preferredUsername());
+		doc = this.documents.save(doc);
+		this.contents.save(new DocumentContent(doc.getId(), content));
+
+		IngestionJob job = new IngestionJob();
+		job.setTenantId(this.tenant.tenantId());
+		job.setDocumentId(doc.getId());
+		job.setType(IngestionJob.Type.INGEST);
+		job = this.jobs.save(job);
+
+		this.ingestion.ingestAsync(doc.getId(), content, doc.getFilename(), job.getId());
+		return ResponseEntity.status(HttpStatus.ACCEPTED)
+			.body(new UploadResponse(doc.getId(), job.getId(), doc.getStatus().name(), false));
+	}
+
+	/** A source given as a URL rather than a file. */
+	public record UrlRequest(@NotBlank @Size(max = 2000) String url, String namespace, String title) {
+	}
+
+	/**
+	 * Adds a page as a source.
+	 *
+	 * <p>The fetch happens as this server, from this network, so the URL is checked before a
+	 * socket is opened and again after every redirect. Once the bytes are here the path is
+	 * identical to an upload — same parsing, same hashing, same de-duplication — because a source
+	 * should not behave differently for having arrived over HTTP.
+	 */
+	@PostMapping("/url")
+	public ResponseEntity<UploadResponse> addUrl(@Valid @RequestBody UrlRequest request) {
+		UrlFetcher.Fetched fetched;
+		try {
+			fetched = this.fetcher.fetch(request.url());
+		}
+		catch (UrlFetcher.NotAllowed ex) {
+			// The caller's URL was the problem, so this is theirs to fix, not a server fault.
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+		}
+
+		byte[] content = fetched.content();
+		if (content.length == 0) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "That URL returned an empty document");
+		}
+
+		String hash = IngestionService.hash(content);
+		String ns = this.namespaces.resolve(request.namespace());
+		var existing = this.documents.findByTenantIdAndNamespaceAndContentHash(this.tenant.tenantId(), ns, hash);
+		if (existing.isPresent()) {
+			return ResponseEntity.ok(new UploadResponse(existing.get().getId(), null,
+					existing.get().getStatus().name(), true));
+		}
+
+		String name = (request.title() != null && !request.title().isBlank()) ? request.title().strip()
+				: fetched.suggestedName();
+
+		DocumentEntity doc = new DocumentEntity();
+		doc.setNamespace(ns);
+		doc.setTenantId(this.tenant.tenantId());
+		doc.setFilename(name);
+		doc.setContentType(fetched.contentType());
+		doc.setSizeBytes((long) content.length);
+		doc.setContentHash(hash);
+		doc.setSourceUrl(fetched.finalUrl());
 		doc.setUploadedBy(this.tenant.preferredUsername());
 		doc = this.documents.save(doc);
 		this.contents.save(new DocumentContent(doc.getId(), content));

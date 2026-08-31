@@ -37,6 +37,8 @@ async function request<T>(token: string | undefined, path: string, init: Request
 export interface DocumentView {
   id: string;
   filename: string;
+  /** Present when the source was fetched from a URL rather than uploaded. */
+  sourceUrl?: string | null;
   title: string | null;
   contentType: string | null;
   sizeBytes: number;
@@ -220,6 +222,30 @@ function ns(namespace?: string) {
   return namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
 }
 
+export interface Transformation {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  prompt: string;
+  applyOnIngest: boolean;
+}
+
+export interface Insight {
+  id: string;
+  documentId: string;
+  transformationName: string;
+  promptUsed: string;
+  output: string;
+  model: string | null;
+  passes: number;
+  durationMs: number | null;
+  createdBy: string | null;
+  /** True when this output was reused from an identical earlier run rather than recomputed. */
+  fromCache: boolean;
+  createdAt: string;
+}
+
 export const api = {
   ask: (token: string | undefined, question: string, documentIds?: string[], namespace?: string) =>
     request<AskResponse>(token, "/chat", {
@@ -271,6 +297,38 @@ export const api = {
       method: "POST",
       body: JSON.stringify(event),
     }),
+
+  addUrl: (token: string | undefined, url: string, namespace?: string, title?: string) =>
+    request<{ documentId: string; jobId: string | null; status: string; duplicate: boolean }>(
+      token,
+      "/documents/url",
+      { method: "POST", body: JSON.stringify({ url, namespace, title }) },
+    ),
+
+  transformations: (token: string | undefined) =>
+    request<Transformation[]>(token, "/transformations"),
+
+  saveTransformation: (
+    token: string | undefined,
+    body: { name: string; description: string; prompt: string; applyOnIngest: boolean },
+    id?: string,
+  ) =>
+    request<Transformation>(token, id ? `/transformations/${id}` : "/transformations", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(body),
+    }),
+
+  deleteTransformation: (token: string | undefined, id: string) =>
+    request<void>(token, `/transformations/${id}`, { method: "DELETE" }),
+
+  runTransformation: (token: string | undefined, documentId: string, slug: string) =>
+    request<Insight>(token, `/documents/${documentId}/transformations/${slug}`, { method: "POST" }),
+
+  insights: (token: string | undefined, documentId: string) =>
+    request<Insight[]>(token, `/documents/${documentId}/insights`),
+
+  deleteInsight: (token: string | undefined, id: string) =>
+    request<void>(token, `/insights/${id}`, { method: "DELETE" }),
 
   deleteDocument: (token: string | undefined, id: string) =>
     request<void>(token, `/documents/${id}`, { method: "DELETE" }),

@@ -75,6 +75,10 @@ public class DocumentEntity {
 	@Column(name = "error_message")
 	private String errorMessage;
 
+	/** The address this source was fetched from, or null when it was uploaded. */
+	@Column(name = "source_url", length = 2000)
+	private String sourceUrl;
+
 	@Column(name = "uploaded_by")
 	private String uploadedBy;
 
@@ -215,6 +219,15 @@ public class DocumentEntity {
 
 	public void setSource(String source) {
 		this.source = source;
+	}
+
+
+	public String getSourceUrl() {
+		return this.sourceUrl;
+	}
+
+	public void setSourceUrl(String sourceUrl) {
+		this.sourceUrl = sourceUrl;
 	}
 
 }

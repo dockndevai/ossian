@@ -17,12 +17,18 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 public class AppConfig {
 
 	/**
-	 * Two caches with very different lifetimes.
+	 * Three caches with deliberately different lifetimes, because what makes a hit stale differs.
 	 * <p>
-	 * {@code embeddings} is keyed on the text itself, so an identical string always embeds to
-	 * the same vector — re-ingesting an unchanged document then costs nothing. {@code retrieval}
-	 * is short-lived because the corpus changes underneath it; a stale hit would answer from
-	 * documents that have since been deleted.
+	 * {@code embeddings} is keyed on the text and the model. Embedding is deterministic, so a hit
+	 * can never be stale and the entry lives for a month; re-ingesting an unchanged document
+	 * costs nothing.
+	 * <p>
+	 * {@code insights} holds transformation output keyed by source text, prompt and model. Also
+	 * deterministic in everything that matters, and by far the most expensive thing to recompute,
+	 * so it is held for a day. Editing a prompt changes the key rather than needing an eviction.
+	 * <p>
+	 * {@code retrieval} is the short one, because it is the only one the corpus can invalidate
+	 * underneath: a hit held too long answers from documents that have since been deleted.
 	 */
 	@Bean
 	RedisCacheManager cacheManager(RedisConnectionFactory factory, OssianProperties properties) {
@@ -35,6 +41,7 @@ public class AppConfig {
 		return RedisCacheManager.builder(factory)
 			.cacheDefaults(base.entryTtl(Duration.ofMinutes(10)))
 			.withCacheConfiguration("embeddings", base.entryTtl(Duration.ofDays(30)))
+			.withCacheConfiguration("insights", base.entryTtl(Duration.ofDays(1)))
 			.withCacheConfiguration("retrieval",
 					base.entryTtl(Duration.ofSeconds(properties.getRetrieval().getCacheSeconds())))
 			.build();

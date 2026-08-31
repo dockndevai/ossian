@@ -19,6 +19,10 @@ public class OssianProperties {
 
 	private Cors cors = new Cors();
 
+	private Transform transform = new Transform();
+
+	private Fetch fetch = new Fetch();
+
 	public Ingest getIngest() {
 		return this.ingest;
 	}
@@ -41,6 +45,22 @@ public class OssianProperties {
 
 	public void setChat(Chat chat) {
 		this.chat = chat;
+	}
+
+	public Transform getTransform() {
+		return this.transform;
+	}
+
+	public void setTransform(Transform transform) {
+		this.transform = transform;
+	}
+
+	public Fetch getFetch() {
+		return this.fetch;
+	}
+
+	public void setFetch(Fetch fetch) {
+		this.fetch = fetch;
 	}
 
 	public Cors getCors() {
@@ -201,6 +221,39 @@ public class OssianProperties {
 
 	}
 
+	/** Running a prompt over a whole source, rather than over retrieved passages. */
+	public static class Transform {
+
+		/**
+		 * How much document text goes into one model call, in characters.
+		 *
+		 * <p>Beyond this the document is read in windows and the results combined, because the
+		 * alternative — silently truncating — produces a summary of the first few pages that
+		 * looks exactly like a summary of the whole thing.
+		 */
+		private int inputBudget = 12000;
+
+		/** Ceiling on how many windows one run will make, so a huge file cannot run away. */
+		private int maxPasses = 12;
+
+		public int getInputBudget() {
+			return this.inputBudget;
+		}
+
+		public void setInputBudget(int inputBudget) {
+			this.inputBudget = inputBudget;
+		}
+
+		public int getMaxPasses() {
+			return this.maxPasses;
+		}
+
+		public void setMaxPasses(int maxPasses) {
+			this.maxPasses = maxPasses;
+		}
+
+	}
+
 	public static class Cors {
 
 		private List<String> allowedOrigins = new ArrayList<>(List.of("http://localhost:5173"));
@@ -211,6 +264,73 @@ public class OssianProperties {
 
 		public void setAllowedOrigins(List<String> allowedOrigins) {
 			this.allowedOrigins = allowedOrigins;
+		}
+
+	}
+
+
+	/** Fetching a source the user gave as a URL. */
+	public static class Fetch {
+
+		/**
+		 * Whether the server may fetch private, loopback and link-local addresses.
+		 *
+		 * <p>False everywhere it matters. Turning it on makes the service an HTTP client that
+		 * anyone signed in can point at the network it sits inside — including the cloud metadata
+		 * endpoint, which hands out credentials to whatever asks from within the instance. The
+		 * option exists because reaching an internal wiki from a laptop is a real need, and a
+		 * switch someone turns on deliberately is safer than one they work around.
+		 */
+		private boolean allowPrivateAddresses = false;
+
+		/** Hard ceiling on the response body. Read, not trusted from Content-Length. */
+		private long maxBytes = 10_485_760;
+
+		private int connectTimeoutSeconds = 10;
+
+		private int readTimeoutSeconds = 20;
+
+		/** Identifies this service to the sites it fetches, so operators can see who called. */
+		private String userAgent = "Ossian/0.1 (+https://github.com/dockndevai/ossian)";
+
+		public boolean isAllowPrivateAddresses() {
+			return this.allowPrivateAddresses;
+		}
+
+		public void setAllowPrivateAddresses(boolean allowPrivateAddresses) {
+			this.allowPrivateAddresses = allowPrivateAddresses;
+		}
+
+		public long getMaxBytes() {
+			return this.maxBytes;
+		}
+
+		public void setMaxBytes(long maxBytes) {
+			this.maxBytes = maxBytes;
+		}
+
+		public int getConnectTimeoutSeconds() {
+			return this.connectTimeoutSeconds;
+		}
+
+		public void setConnectTimeoutSeconds(int connectTimeoutSeconds) {
+			this.connectTimeoutSeconds = connectTimeoutSeconds;
+		}
+
+		public int getReadTimeoutSeconds() {
+			return this.readTimeoutSeconds;
+		}
+
+		public void setReadTimeoutSeconds(int readTimeoutSeconds) {
+			this.readTimeoutSeconds = readTimeoutSeconds;
+		}
+
+		public String getUserAgent() {
+			return this.userAgent;
+		}
+
+		public void setUserAgent(String userAgent) {
+			this.userAgent = userAgent;
 		}
 
 	}

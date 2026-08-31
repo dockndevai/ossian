@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { api, askStream, type Citation, type DocumentView } from "../api/client";
+import StudioPanel from "./StudioPanel";
 import { useNamespace } from "../app/NamespaceContext";
 
 /**
@@ -38,6 +39,9 @@ export default function NotebookPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [openCitation, setOpenCitation] = useState<Citation | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [urlValue, setUrlValue] = useState("");
+  const [addingUrl, setAddingUrl] = useState(false);
+  const [studioFor, setStudioFor] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
 
@@ -90,6 +94,25 @@ export default function NotebookPage() {
       }
     }
     await loadDocs();
+  }
+
+  async function addUrl(e: React.FormEvent) {
+    e.preventDefault();
+    const url = urlValue.trim();
+    if (!url || addingUrl) return;
+    setAddingUrl(true);
+    setUploadError(null);
+    try {
+      await api.addUrl(token, url, undefined, undefined);
+      setUrlValue("");
+      await loadDocs();
+    } catch (err) {
+      // The server refuses addresses only reachable from inside its own network, and says which
+      // category — surface that rather than a generic failure.
+      setUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAddingUrl(false);
+    }
   }
 
   async function remove(id: string) {
@@ -182,6 +205,15 @@ export default function NotebookPage() {
           <strong>Add a source</strong>
           <span className="muted small">drop files here, or click to choose</span>
         </label>
+        <form className="url-add" onSubmit={addUrl}>
+          <input
+            type="url"
+            value={urlValue}
+            placeholder="or paste a link…"
+            onChange={(e) => setUrlValue(e.target.value)}
+          />
+          <button disabled={addingUrl || !urlValue.trim()}>{addingUrl ? "…" : "Add"}</button>
+        </form>
         {uploadError && <p className="error small">{uploadError}</p>}
 
         {docs.length === 0 && <p className="muted small">Nothing yet. Add a source to ask about it.</p>}
@@ -203,7 +235,19 @@ export default function NotebookPage() {
               <div className="source-meta">
                 <span className={`chip ${statusClass(d.status)}`}>{d.status.toLowerCase()}</span>
                 {d.status === "READY" && <span className="chip">{d.chunkCount} chunks</span>}
+                {d.sourceUrl && (
+                  <a className="chip" href={d.sourceUrl} target="_blank" rel="noreferrer" title={d.sourceUrl}>
+                    link
+                  </a>
+                )}
                 <span className="spacer" />
+                <button
+                  className="link"
+                  title="Run transformations over this whole source"
+                  onClick={() => setStudioFor(studioFor === d.id ? null : d.id)}
+                >
+                  {studioFor === d.id ? "hide" : "studio"}
+                </button>
                 <button className="link" title="Remove source" onClick={() => void remove(d.id)}>
                   remove
                 </button>
@@ -300,6 +344,12 @@ export default function NotebookPage() {
           </button>
         </form>
       </section>
+
+      {studioFor && !openCitation && (
+        <aside className="citation-pane">
+          <StudioPanel document={docs.find((d) => d.id === studioFor)!} />
+        </aside>
+      )}
 
       {openCitation && (
         <aside className="citation-pane">

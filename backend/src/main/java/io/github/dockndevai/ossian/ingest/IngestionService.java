@@ -15,8 +15,10 @@ import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
 import io.github.dockndevai.ossian.settings.SettingsService;
+import io.github.dockndevai.ossian.transform.TransformationService;
 
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.ByteArrayResource;
@@ -59,13 +61,47 @@ public class IngestionService {
 
 	private final SettingsService settings;
 
+	/**
+	 * Resolved lazily. Transformations read documents and content, and ingestion triggers
+	 * transformations; asking for the bean at construction would be a cycle.
+	 */
+	private final ObjectProvider<TransformationService> transformations;
+
 	public IngestionService(DocumentRepository documents, IngestionJobRepository jobs, VectorStore vectorStore,
-			OssianProperties properties, SettingsService settings) {
+			OssianProperties properties, SettingsService settings,
+			ObjectProvider<TransformationService> transformations) {
 		this.documents = documents;
 		this.jobs = jobs;
 		this.vectorStore = vectorStore;
 		this.properties = properties;
 		this.settings = settings;
+		this.transformations = transformations;
+	}
+
+	/**
+	 * Parses a file to plain text.
+	 *
+	 * <p>Shared with transformations, which need the whole document rather than the chunks the
+	 * retriever would return. Tika sniffs the format from the bytes, so PDF, DOCX, HTML and text
+	 * all work without the caller branching on type.
+	 */
+	public static String parseToText(byte[] content, String filename) {
+		TikaDocumentReader reader = new TikaDocumentReader(new ByteArrayResource(content) {
+			@Override
+			public String getFilename() {
+				return filename;
+			}
+		});
+		StringBuilder sb = new StringBuilder();
+		for (Document parsed : reader.get()) {
+			if (parsed.getText() != null && !parsed.getText().isBlank()) {
+				if (!sb.isEmpty()) {
+					sb.append("\n\n");
+				}
+				sb.append(parsed.getText());
+			}
+		}
+		return sb.toString();
 	}
 
 	/** SHA-256 of the raw bytes, so the same file uploaded twice is recognised rather than duplicated. */
@@ -93,6 +129,7 @@ public class IngestionService {
 			int written = ingest(documentId, content, filename);
 			job.succeed(written);
 			this.jobs.save(job);
+			runIngestTransformations(documentId);
 		}
 		catch (Exception ex) {
 			log.error("Ingestion failed for document {}", documentId, ex);
@@ -159,6 +196,27 @@ public class IngestionService {
 		this.documents.save(entity);
 		log.info("Ingested {} ({} chunks) for tenant {}", filename, chunks.size(), entity.getTenantId());
 		return chunks.size();
+	}
+
+	/**
+	 * Applies any transformation marked to run on ingest.
+	 *
+	 * <p>Deliberately after the job is recorded as succeeded. A transformation is a convenience
+	 * on top of a document that is already indexed and answerable; if the model is down, the
+	 * ingest still worked and should say so.
+	 */
+	private void runIngestTransformations(UUID documentId) {
+		try {
+			DocumentEntity entity = this.documents.findById(documentId).orElse(null);
+			if (entity != null) {
+				// The tenant is passed explicitly: this runs on an async thread where the
+				// security context is not propagated.
+				this.transformations.getObject().runOnIngest(entity, entity.getTenantId());
+			}
+		}
+		catch (RuntimeException ex) {
+			log.warn("On-ingest transformations failed for document {}: {}", documentId, ex.getMessage());
+		}
 	}
 
 	/**
