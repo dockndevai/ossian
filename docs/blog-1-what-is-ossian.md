@@ -208,7 +208,8 @@ means grounding has broken.
 
 ---
 
-*Ossian is Apache-2.0 at [github.com/dockndevai/ossian](https://github.com/dockndevai/ossian).
+*Ossian is Apache-2.0 at [github.com/dockndevai/ossian](https://github.com/dockndevai/ossian),
+with a short overview and a demo at [dockndevai.github.io/ossian-site](https://dockndevai.github.io/ossian-site/).
 Issues and disagreement welcome — particularly about the refusal threshold, which is the setting
 most likely to be wrong for your corpus.*
 

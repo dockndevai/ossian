@@ -177,7 +177,8 @@ you get a confident paragraph back, nothing else about the tool matters.
 
 ---
 
-*Ossian: [github.com/dockndevai/ossian](https://github.com/dockndevai/ossian) ·
+*Ossian: [dockndevai.github.io/ossian-site](https://dockndevai.github.io/ossian-site/) ·
+[github.com/dockndevai/ossian](https://github.com/dockndevai/ossian) ·
 Open Notebook: [github.com/lfnovo/open-notebook](https://github.com/lfnovo/open-notebook) ·
 Gemini Notebook: [notebooklm.google.com](https://notebooklm.google.com)*
 
