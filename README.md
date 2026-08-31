@@ -41,17 +41,30 @@ token quotas and metering. Point `LLM_BASE_URL` straight at Ollama to cut it out
 
 ## A tour
 
+![Asking a question, opening the cited passage, watching the corpus refuse one it cannot answer, then the vector inspector, agent memory and the operations console](docs/media/demo/ossian-demo.gif)
+
+*Thirty seconds, at two and a half times speed.* In order: a question answered from the corpus
+with its citation opened, the same corpus **refusing** a question it cannot support, the vector
+inspector, agent memory ranked by relevance and importance, and the operations console.
+[Higher quality as MP4](docs/media/demo/ossian-demo.mp4).
+
+The refusal is the part worth watching for. Asked who won the 1998 World Cup — nothing to do with
+a company handbook — it answers *"I could not find anything about that in your documents"* and
+never calls the model. An unsupported answer is worse than no answer, because it is
+indistinguishable from a good one.
+
+<details>
+<summary><b>The same tour as stills, with what each one is showing</b></summary>
+
 ### Ask, and get the passage the answer came from
 
 ![The notebook: a grounded answer with an inline citation, sources on the left](docs/media/demo/01-notebook.png)
 
-Sources on the left, conversation in the middle. The `[1]` in the answer is a link to the passage
-it came from, and the chips below carry each source's similarity score. `grounded` means the
-answer was written from retrieved text; the alternative is the refusal below.
+Sources on the left, conversation in the middle. The `[1]` in the answer links to the passage it
+came from, and the chips below carry each source's similarity score. `grounded` means the answer
+was written from retrieved text.
 
-Ask something the corpus does not cover and you get **"I could not find anything about that in
-your documents"** — and the model is never called. That is the feature, not a failure. Those
-refusals are recorded, and the **Gaps** list is the most useful ingestion backlog anyone has
+Refusals are recorded, and the **Gaps** list is the most useful ingestion backlog anyone has
 handed a documentation team.
 
 ### See what the retriever sees
@@ -108,14 +121,11 @@ An event API for CDC streams and webhooks, idempotent on a caller-assigned event
 delivery is the normal case, and a pipeline that resends after a crash should not produce a second
 copy.
 
-### And what a first-time visitor sees
-
-![The landing page](docs/media/demo/07-landing.png)
+</details>
 
 Everything above is reproducible in about five minutes — see **Quick start** below, then
 `./scripts/smoke.sh`, which ingests the sample corpus and asks five questions. The fifth is
-deliberately unanswerable from it: an answer to that one means grounding has broken, which is the
-single failure worth watching for.
+deliberately unanswerable from it: an answer to that one means grounding has broken.
 
 ---
 

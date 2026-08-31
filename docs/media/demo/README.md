@@ -1,18 +1,27 @@
-# Demo screenshots
+# Demo assets
 
-Regenerated rather than hand-taken, so they cannot drift from the UI:
+Regenerated rather than hand-made, so they cannot drift from the UI.
 
 ```bash
 docker compose up -d
 ./mvnw -pl backend spring-boot:run
 cd frontend && npm run dev
-node docs/media/demo/capture.mjs docs/media/demo
+
+node docs/media/demo/record.mjs /tmp/ossian-frames      # drive the walkthrough, capture frames
+./docs/media/demo/encode.sh /tmp/ossian-frames docs/media/demo   # frames -> gif + mp4
+node docs/media/demo/capture.mjs docs/media/demo        # the stills
 ```
 
-`capture.mjs` drives headless Chrome over the DevTools Protocol. It seeds an OIDC session in
-`sessionStorage`, pins the light theme so the images are consistent, asks a real question and
-**waits for the citation chips** before capturing — a fixed delay would photograph a spinner
-whenever the model is slow.
+Both scripts drive headless Chrome over the DevTools Protocol. They seed an OIDC session in
+`sessionStorage` and pin the light theme, so the output is consistent between runs — and they
+sign in *before* recording starts, so no credential is ever on screen.
 
-Captured at 1440×900 with `deviceScaleFactor: 2`, so they stay sharp on a retina display and in
-GitHub's own image viewer.
+The recorder captures on a loop running alongside the walkthrough rather than between its steps,
+which is what catches the answer streaming in. It waits for the citation chips to appear before
+moving on; a fixed delay would film a spinner whenever the model is slow.
+
+`encode.sh` produces both a GIF and an MP4. GitHub renders a GIF inline from a repository path
+and will not render an MP4 from one, but the MP4 is a third the size at better quality, so it is
+worth keeping for anywhere that can play it. Playback is 12.5 fps against a 5 fps capture — two
+and a half times real speed, because the walkthrough takes about eighty seconds to perform and
+nobody watches eighty seconds of a README.
