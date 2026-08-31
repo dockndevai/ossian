@@ -56,14 +56,24 @@ public class RateLimiter {
 	 * breaks the UI it is protecting.
 	 */
 	public Decision check(String caller, int perMinute) {
-		if (perMinute <= 0) {
+		return checkCost(caller, perMinute, 1);
+	}
+
+	/**
+	 * Spends {@code cost} against the bucket rather than one unit.
+	 *
+	 * <p>What makes this usable for embedding tokens as well as requests: a batch of four
+	 * thousand tokens should cost four thousand, not count as a single call.
+	 */
+	public Decision checkCost(String caller, int perMinute, int cost) {
+		if (perMinute <= 0 || cost <= 0) {
 			return new Decision(true, Long.MAX_VALUE, 0, perMinute);
 		}
 		double refillPerSecond = perMinute / 60.0;
 		try {
 			List<?> result = this.redis.execute(this.script, List.of("ossian:rl:" + caller),
 					String.valueOf(perMinute), String.valueOf(refillPerSecond),
-					String.valueOf(System.currentTimeMillis()), "1");
+					String.valueOf(System.currentTimeMillis()), String.valueOf(cost));
 			if (result == null || result.size() < 3) {
 				return new Decision(true, perMinute, 0, perMinute);
 			}

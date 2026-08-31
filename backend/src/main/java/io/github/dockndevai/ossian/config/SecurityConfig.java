@@ -58,6 +58,9 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 				// Everything that touches documents or the retrieval layer needs a token.
 				.requestMatchers("/api/admin/**").hasRole("ossian-admin")
+				// Not under /api/admin, but it decides how every future document in a namespace
+				// is cut, so it belongs behind the same role as the installation-wide setting.
+				.requestMatchers(HttpMethod.PUT, "/api/namespaces/*/chunking").hasRole("ossian-admin")
 				.anyRequest().authenticated())
 			.oauth2ResourceServer(oauth -> oauth
 				// Without this the resource server still resolves an "Authorization: Bearer osk_..."

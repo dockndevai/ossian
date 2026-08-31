@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import io.github.dockndevai.ossian.caller.CallerContext;
+import io.github.dockndevai.ossian.settings.SettingsService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,9 +19,12 @@ public class NamespaceService {
 
 	private final CallerContext tenant;
 
-	public NamespaceService(NamespaceRepository repository, CallerContext tenant) {
+	private final SettingsService settings;
+
+	public NamespaceService(NamespaceRepository repository, CallerContext tenant, SettingsService settings) {
 		this.repository = repository;
 		this.tenant = tenant;
+		this.settings = settings;
 	}
 
 	/**
@@ -55,6 +59,56 @@ public class NamespaceService {
 	 * alternative — a typo silently returning an empty corpus — reads as "the documents are
 	 * gone" and sends people looking in the wrong place.
 	 */
+	/**
+	 * The chunking in force for a namespace: its own if set, otherwise the installation default.
+	 *
+	 * <p>Resolved here rather than at the call site so that "unset means inherit" is decided in
+	 * one place. A caller reading the column directly would treat null as zero and produce a
+	 * splitter that either never splits or never terminates.
+	 */
+	public Chunking chunkingFor(String namespace) {
+		int defaultSize = this.settings.effectiveInt(SettingsService.INGEST_CHUNK_SIZE);
+		int defaultOverlap = this.settings.effectiveInt(SettingsService.INGEST_CHUNK_OVERLAP);
+		if (namespace == null || namespace.isBlank()) {
+			return new Chunking(defaultSize, defaultOverlap, false);
+		}
+		return this.repository.findByName(NamespaceEntity.slug(namespace))
+			.map(n -> new Chunking(n.getChunkSize() == null ? defaultSize : n.getChunkSize(),
+					n.getChunkOverlap() == null ? defaultOverlap : n.getChunkOverlap(),
+					n.getChunkSize() != null || n.getChunkOverlap() != null))
+			.orElse(new Chunking(defaultSize, defaultOverlap, false));
+	}
+
+	/** @param overridden whether these came from the namespace rather than the default */
+	public record Chunking(int size, int overlap, boolean overridden) {
+	}
+
+	@Transactional
+	public NamespaceEntity setChunking(String name, Integer size, Integer overlap) {
+		NamespaceEntity entity = this.repository.findByName(NamespaceEntity.slug(name))
+			.orElseThrow(() -> new IllegalArgumentException("Unknown namespace: " + name));
+		// Bounds match the global setting's, so a namespace cannot be configured into a state the
+		// installation-wide form would reject.
+		if (size != null && (size < 200 || size > 8000)) {
+			throw new IllegalArgumentException("Chunk size must be between 200 and 8000 characters");
+		}
+		if (overlap != null && (overlap < 0 || overlap > 2000)) {
+			throw new IllegalArgumentException("Chunk overlap must be between 0 and 2000 characters");
+		}
+		// Overlap at or above half the chunk size makes little forward progress and multiplies
+		// the corpus; the splitter clamps it, but rejecting is more honest than silently
+		// ignoring what was asked for.
+		int effectiveSize = (size != null) ? size
+				: this.settings.effectiveInt(SettingsService.INGEST_CHUNK_SIZE);
+		if (overlap != null && overlap >= effectiveSize / 2) {
+			throw new IllegalArgumentException("Chunk overlap must be less than half the chunk size ("
+					+ (effectiveSize / 2) + ")");
+		}
+		entity.setChunkSize(size);
+		entity.setChunkOverlap(overlap);
+		return this.repository.save(entity);
+	}
+
 	public String resolve(String requested) {
 		Optional<String> confined = this.tenant.confinedNamespace();
 		if (confined.isPresent()) {

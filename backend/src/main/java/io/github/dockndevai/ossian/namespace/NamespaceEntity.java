@@ -35,6 +35,19 @@ public class NamespaceEntity {
 
 	private String description;
 
+	/**
+	 * Chunking for this namespace, or null to use the installation default.
+	 *
+	 * <p>Changing it affects documents indexed afterwards. Existing chunks keep their shape until
+	 * reindexed, which is the same rule as the global setting and for the same reason: silently
+	 * mixing two chunking strategies in one corpus is worse than a stale one.
+	 */
+	@Column(name = "chunk_size")
+	private Integer chunkSize;
+
+	@Column(name = "chunk_overlap")
+	private Integer chunkOverlap;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt = Instant.now();
 
@@ -87,6 +100,23 @@ public class NamespaceEntity {
 
 	public void setCreatedAt(Instant createdAt) {
 		this.createdAt = createdAt;
+	}
+
+
+	public Integer getChunkSize() {
+		return this.chunkSize;
+	}
+
+	public void setChunkSize(Integer chunkSize) {
+		this.chunkSize = chunkSize;
+	}
+
+	public Integer getChunkOverlap() {
+		return this.chunkOverlap;
+	}
+
+	public void setChunkOverlap(Integer chunkOverlap) {
+		this.chunkOverlap = chunkOverlap;
 	}
 
 }

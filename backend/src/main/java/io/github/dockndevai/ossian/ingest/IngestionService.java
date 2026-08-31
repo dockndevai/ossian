@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
+import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.observability.PipelineMetrics;
 import io.github.dockndevai.ossian.settings.SettingsService;
 import io.github.dockndevai.ossian.transform.TransformationService;
@@ -68,9 +69,15 @@ public class IngestionService {
 
 	private final PipelineMetrics metrics;
 
+	private final EmbeddingBatcher batcher;
+
+	private final IngestThrottle throttle;
+
+	private final NamespaceService namespaces;
+
 	public IngestionService(DocumentRepository documents, IngestionJobRepository jobs, VectorStore vectorStore,
 			OssianProperties properties, SettingsService settings,
-			ObjectProvider<TransformationService> transformations, PipelineMetrics metrics) {
+			ObjectProvider<TransformationService> transformations, PipelineMetrics metrics, EmbeddingBatcher batcher, IngestThrottle throttle, NamespaceService namespaces) {
 		this.documents = documents;
 		this.jobs = jobs;
 		this.vectorStore = vectorStore;
@@ -78,6 +85,9 @@ public class IngestionService {
 		this.settings = settings;
 		this.transformations = transformations;
 		this.metrics = metrics;
+		this.batcher = batcher;
+		this.throttle = throttle;
+		this.namespaces = namespaces;
 	}
 
 	/**
@@ -168,15 +178,15 @@ public class IngestionService {
 		});
 		List<Document> parsed = reader.get();
 
-		OssianProperties.Ingest cfg = this.properties.getIngest();
-		// Chunking is read from settings rather than straight from the file, so it can be tuned
-		// without a redeploy. Changing it only affects documents indexed afterwards; existing
-		// chunks stay as they were until reindexed, which is why the setting is flagged as
-		// requiring a reindex in the UI. Safe to read here despite running on an async thread,
-		// because settings are installation-wide and need no request context.
-		ChunkSplitter splitter = new ChunkSplitter(
-				this.settings.effectiveInt(SettingsService.INGEST_CHUNK_SIZE),
-				this.settings.effectiveInt(SettingsService.INGEST_CHUNK_OVERLAP));
+		// Chunking comes from the namespace, falling back to the installation setting. A runbook
+		// answers best in small passages; a contract answers worst that way, because a clause cut
+		// in half means the opposite of what it says. Changing it only affects documents indexed
+		// afterwards — existing chunks keep their shape until reindexed.
+		//
+		// Safe to read on this async thread: neither settings nor namespaces need a request
+		// context, and the namespace comes from the entity rather than from the caller.
+		NamespaceService.Chunking chunking = this.namespaces.chunkingFor(entity.getNamespace());
+		ChunkSplitter splitter = new ChunkSplitter(chunking.size(), chunking.overlap());
 		List<Document> chunks = splitter.apply(parsed);
 
 		for (int i = 0; i < chunks.size(); i++) {
@@ -187,12 +197,27 @@ public class IngestionService {
 			meta.put(META_NAMESPACE, entity.getNamespace());
 		}
 
-		// Batched so a large document does not become one enormous embedding request that the
-		// upstream rejects or times out on.
-		int batch = Math.max(1, cfg.getEmbeddingBatchSize());
-		for (int i = 0; i < chunks.size(); i += batch) {
-			this.vectorStore.add(chunks.subList(i, Math.min(chunks.size(), i + batch)));
+		// Batched on tokens rather than a fixed count, because that is the bound the embedding
+		// endpoint actually enforces.
+		List<List<Document>> batches = this.batcher.batch(chunks);
+		for (List<Document> batch : batches) {
+			int cost = this.batcher.totalTokens(batch);
+			try {
+				// Waits for embedding budget rather than failing: the caller has already been
+				// told the document is pending, so slowing down is invisible and correct.
+				if (!this.throttle.acquire(cost)) {
+					throw new IllegalStateException(
+							"Timed out waiting for embedding budget; the queue is saturated");
+				}
+			}
+			catch (InterruptedException ex) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("Ingestion was interrupted while waiting for budget", ex);
+			}
+			this.vectorStore.add(batch);
 		}
+		log.debug("embedded {} chunks in {} batches for {}", chunks.size(), batches.size(),
+				entity.getFilename());
 
 		entity.setChunkCount(chunks.size());
 		entity.setStatus(DocumentEntity.Status.READY);

@@ -9,7 +9,13 @@ import jakarta.validation.constraints.Size;
 
 import io.github.dockndevai.ossian.document.DocumentRepository;
 
+import java.util.Map;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,7 +33,12 @@ public class NamespaceController {
 	 * in it. An empty namespace is then visibly empty rather than a guess.
 	 */
 	public record NamespaceView(String name, String description, long documents, long chunks,
+			Integer chunkSize, Integer chunkOverlap, int effectiveChunkSize, int effectiveChunkOverlap,
 			Instant createdAt) {
+	}
+
+	/** Null in either field means "inherit the installation default". */
+	public record ChunkingRequest(Integer chunkSize, Integer chunkOverlap) {
 	}
 
 	public record CreateRequest(@NotBlank @Size(max = 128) String name, @Size(max = 500) String description) {
@@ -52,9 +63,29 @@ public class NamespaceController {
 		return view(this.namespaces.create(request.name(), request.description()));
 	}
 
+	/**
+	 * Sets or clears this namespace's chunking.
+	 *
+	 * <p>Under {@code /api/namespaces} rather than {@code /api/admin} would be wrong — chunking
+	 * decides how every future document in the namespace is cut, so it belongs behind the admin
+	 * role like the installation-wide equivalent.
+	 */
+	@PutMapping("/{name}/chunking")
+	public ResponseEntity<?> chunking(@PathVariable String name, @RequestBody ChunkingRequest request) {
+		try {
+			return ResponseEntity
+				.ok(view(this.namespaces.setChunking(name, request.chunkSize(), request.chunkOverlap())));
+		}
+		catch (IllegalArgumentException ex) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", ex.getMessage()));
+		}
+	}
+
 	private NamespaceView view(NamespaceEntity e) {
+		NamespaceService.Chunking effective = this.namespaces.chunkingFor(e.getName());
 		return new NamespaceView(e.getName(), e.getDescription(),
 				this.documents.countByNamespace(e.getName()), this.documents.sumChunksByNamespace(e.getName()),
+				e.getChunkSize(), e.getChunkOverlap(), effective.size(), effective.overlap(),
 				e.getCreatedAt());
 	}
 

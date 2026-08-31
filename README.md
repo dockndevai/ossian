@@ -416,6 +416,62 @@ redeploy. Clearing a field restores the default rather than storing an empty val
 Chunk size and overlap apply to documents indexed *afterwards*. Existing chunks keep their old
 shape until reindexed, which is why those two are flagged in the UI.
 
+### Chunking per namespace
+
+One chunk size for a whole installation is a compromise between documents that have nothing in
+common. A runbook answers best in small passages, because a question is about one procedure; a
+contract answers worst that way, because a clause cut in half means the opposite of what it says.
+
+```bash
+curl -X PUT localhost:8081/api/namespaces/runbooks/chunking \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"chunkSize":400,"chunkOverlap":80}'
+```
+
+Null in either field inherits the installation default, so an existing namespace keeps behaving
+exactly as it did and nothing is re-indexed on upgrade. The same file ingested into two
+namespaces: 4 chunks averaging 1082 characters in `default`, 15 averaging 323 in `runbooks`.
+
+---
+
+## Ingestion throughput
+
+Three separate bounds, because they fail in three different ways.
+
+**Batching is on tokens, not on a count of chunks.** A fixed item count is the wrong unit —
+embedding endpoints reject on total tokens, so twenty-five short notes and twenty-five long
+passages are the same number and wildly different requests. One wastes most of the budget it
+could have used; the other is rejected outright.
+
+Tokens are counted with the real tokenizer rather than the usual four-characters-per-token rule.
+That heuristic is roughly right for English prose and badly wrong for what people actually
+ingest: code, tables, JSON and non-Latin scripts all run denser, so a limit set from it is
+exceeded exactly on the documents most likely to be large.
+
+**Ingestion has its own rate limit, measured in embedding tokens.** The HTTP limiter counts
+requests, which does not describe this at all: one upload is one request and can be a million
+tokens of embedding. Ingestion that respects a request limit perfectly can still exhaust a day's
+model budget in a minute. It **waits** rather than refusing — the caller has already been told
+the document is pending, so slowing down is invisible and correct, where failing the job would
+turn a queue into a pile of errors to retry by hand. The wait is bounded, because a job blocked
+forever holds a thread and a connection.
+
+**The pool is bounded.** Without it `@Async` uses Boot's default: eight threads and an
+effectively unbounded queue, so two hundred uploads queue two hundred embeddings and the failure
+surfaces as connection-pool exhaustion, a long way from the cause. Three at a time by default —
+ingestion is bound by the embedding endpoint, not by local CPU, and running thirty at once just
+spreads the same throughput over thirty half-finished documents instead of finishing three. A
+full queue runs the work on the calling thread, so the upload blocks: backpressure the client can
+feel.
+
+| Setting | Default |
+|---|---|
+| `ossian.ingest.embedding-batch-tokens` | 8000 |
+| `ossian.ingest.embedding-batch-size` | 25 |
+| `ossian.ingest.embedding-tokens-per-minute` | 200000 |
+| `ossian.ingest.concurrency` | 3 |
+| `ossian.ingest.max-throttle-wait-seconds` | 300 |
+
 ---
 
 ## Event-driven ingestion

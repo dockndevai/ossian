@@ -97,7 +97,39 @@ public class OssianProperties {
 		private long maxFileSize = 25L * 1024 * 1024;
 
 		/** How many chunks to embed per call to the model. */
+		/**
+		 * Hard cap on items per embedding call, alongside the token budget below. Some endpoints
+		 * limit inputs per request regardless of size, and a thousand one-token chunks would
+		 * satisfy any token budget while breaking that.
+		 */
 		private int embeddingBatchSize = 25;
+
+		/**
+		 * Token budget per embedding call.
+		 *
+		 * <p>The bound that actually matters: embedding endpoints reject on total tokens, so a
+		 * fixed item count is the wrong unit — twenty-five short notes and twenty-five long
+		 * passages are the same number and wildly different requests.
+		 *
+		 * <p>8,000 sits under the common 8,192 limit with room for the request envelope.
+		 */
+		private int embeddingBatchTokens = 8000;
+
+		/**
+		 * Ceiling on embedding tokens per minute across all ingestion.
+		 *
+		 * <p>The HTTP rate limiter counts requests, which does not describe this at all: one
+		 * upload is one request and can be a million tokens of embedding. Zero disables it.
+		 */
+		private int embeddingTokensPerMinute = 200_000;
+
+		/** How many documents may be ingested at once. Bounded so a bulk import cannot starve
+		 * the request threads or the connection pool. */
+		private int concurrency = 3;
+
+		/** How long a job waits for embedding budget before failing with a reason rather than
+		 * holding a thread indefinitely. */
+		private int maxThrottleWaitSeconds = 300;
 
 		public int getChunkSize() {
 			return this.chunkSize;
@@ -129,6 +161,38 @@ public class OssianProperties {
 
 		public void setEmbeddingBatchSize(int embeddingBatchSize) {
 			this.embeddingBatchSize = embeddingBatchSize;
+		}
+
+		public int getEmbeddingBatchTokens() {
+			return this.embeddingBatchTokens;
+		}
+
+		public void setEmbeddingBatchTokens(int embeddingBatchTokens) {
+			this.embeddingBatchTokens = embeddingBatchTokens;
+		}
+
+		public int getEmbeddingTokensPerMinute() {
+			return this.embeddingTokensPerMinute;
+		}
+
+		public void setEmbeddingTokensPerMinute(int embeddingTokensPerMinute) {
+			this.embeddingTokensPerMinute = embeddingTokensPerMinute;
+		}
+
+		public int getConcurrency() {
+			return this.concurrency;
+		}
+
+		public void setConcurrency(int concurrency) {
+			this.concurrency = concurrency;
+		}
+
+		public int getMaxThrottleWaitSeconds() {
+			return this.maxThrottleWaitSeconds;
+		}
+
+		public void setMaxThrottleWaitSeconds(int maxThrottleWaitSeconds) {
+			this.maxThrottleWaitSeconds = maxThrottleWaitSeconds;
 		}
 
 	}
