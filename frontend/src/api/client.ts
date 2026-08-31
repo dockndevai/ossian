@@ -275,6 +275,32 @@ export interface AgentSummary {
   newest: string;
 }
 
+export interface Throughput {
+  documents: number;
+  succeeded: number;
+  failed: number;
+  chunks: number;
+  successRate: number | null;
+  avgDurationMs: number | null;
+  p95DurationMs: number | null;
+}
+
+export interface FailureGroup {
+  reason: string;
+  count: number;
+  mostRecent: string;
+  examples: string[];
+}
+
+export interface StuckDocument {
+  documentId: string;
+  filename: string;
+  namespace: string | null;
+  status: string;
+  errorMessage: string | null;
+  since: string;
+}
+
 export const api = {
   ask: (token: string | undefined, question: string, documentIds?: string[], namespace?: string) =>
     request<AskResponse>(token, "/chat", {
@@ -397,6 +423,17 @@ export const api = {
 
   reindex: (token: string | undefined, id: string) =>
     request<unknown>(token, `/admin/documents/${id}/reindex`, { method: "POST" }),
+
+  throughput: (token: string | undefined, hours = 24) =>
+    request<Throughput>(token, `/admin/pipeline/throughput?hours=${hours}`),
+
+  failures: (token: string | undefined, hours = 168) =>
+    request<FailureGroup[]>(token, `/admin/pipeline/failures?hours=${hours}`),
+
+  stuck: (token: string | undefined) => request<StuckDocument[]>(token, "/admin/pipeline/stuck"),
+
+  retryIngest: (token: string | undefined, documentId: string) =>
+    request<StuckDocument>(token, `/admin/pipeline/retry?documentId=${documentId}`, { method: "POST" }),
 
   agents: (token: string | undefined) => request<AgentSummary[]>(token, "/memory/agents"),
 

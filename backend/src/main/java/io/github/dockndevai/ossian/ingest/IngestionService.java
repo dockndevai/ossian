@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
+import io.github.dockndevai.ossian.observability.PipelineMetrics;
 import io.github.dockndevai.ossian.settings.SettingsService;
 import io.github.dockndevai.ossian.transform.TransformationService;
 
@@ -65,15 +66,18 @@ public class IngestionService {
 	 */
 	private final ObjectProvider<TransformationService> transformations;
 
+	private final PipelineMetrics metrics;
+
 	public IngestionService(DocumentRepository documents, IngestionJobRepository jobs, VectorStore vectorStore,
 			OssianProperties properties, SettingsService settings,
-			ObjectProvider<TransformationService> transformations) {
+			ObjectProvider<TransformationService> transformations, PipelineMetrics metrics) {
 		this.documents = documents;
 		this.jobs = jobs;
 		this.vectorStore = vectorStore;
 		this.properties = properties;
 		this.settings = settings;
 		this.transformations = transformations;
+		this.metrics = metrics;
 	}
 
 	/**
@@ -123,22 +127,30 @@ public class IngestionService {
 		job.start();
 		this.jobs.save(job);
 
+		String namespace = this.documents.findById(documentId).map(DocumentEntity::getNamespace).orElse(null);
+		long started = System.nanoTime();
 		try {
 			int written = ingest(documentId, content, filename);
 			job.succeed(written);
 			this.jobs.save(job);
+			this.metrics.ingestCompleted(namespace, true, written, elapsed(started));
 			runIngestTransformations(documentId);
 		}
 		catch (Exception ex) {
 			log.error("Ingestion failed for document {}", documentId, ex);
 			job.fail(ex.getMessage());
 			this.jobs.save(job);
+			this.metrics.ingestCompleted(namespace, false, 0, elapsed(started));
 			this.documents.findById(documentId).ifPresent(doc -> {
 				doc.setStatus(DocumentEntity.Status.FAILED);
 				doc.setErrorMessage(ex.getMessage());
 				this.documents.save(doc);
 			});
 		}
+	}
+
+	private static java.time.Duration elapsed(long startedNanos) {
+		return java.time.Duration.ofNanos(System.nanoTime() - startedNanos);
 	}
 
 	@Transactional

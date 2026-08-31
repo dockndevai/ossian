@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { api, type DocumentView } from "../api/client";
 import { useNamespace } from "../app/NamespaceContext";
+import PipelinePanel from "./PipelinePanel";
 
 /**
  * The maintenance view.
@@ -101,6 +102,8 @@ export default function AdminPage() {
           ? `Showing ${namespace}. Ingestion jobs are listed across all namespaces.`
           : "Showing every namespace."}
       </div>
+
+      <PipelinePanel />
 
       <section className="panel">
         <h2>Corpus</h2>

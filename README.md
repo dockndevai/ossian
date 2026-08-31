@@ -143,6 +143,44 @@ is a model swap that quietly degrades retrieval.
 
 ---
 
+## Ingestion observability
+
+Prometheus has the rates; the **Console** answers the question people actually ask, which is why
+one document is stuck.
+
+```bash
+# a scraper authenticates with an API key, like any other machine caller
+curl -H "X-API-Key: osk_..." localhost:8081/actuator/prometheus | grep ^ossian_
+```
+
+| Metric | Tags | Reads as |
+|---|---|---|
+| `ossian_ingest_duration_seconds` | namespace, outcome | how long a document takes, and whether it made it |
+| `ossian_ingest_chunks_total` | namespace | what the embedding bill is charged in |
+| `ossian_retrieval_duration_seconds` | namespace, grounded | question latency, split by whether the corpus could answer |
+| `ossian_retrieval_chunks_total` | namespace | passages returned per question |
+| `ossian_transform_duration_seconds` | transformation, cached | what the cache is saving |
+
+The `grounded` tag is the corpus health signal: a rising rate of `grounded="false"` means people
+are asking things the documents do not cover, which is a gap to fill rather than a bug to fix.
+
+Tag cardinality is deliberately low — namespace is a tag because a corpus has a handful of them,
+document id is not, because a tag with unbounded values turns a time-series database into a very
+slow log.
+
+The console adds what a graph cannot: **failures grouped by cause** (on the first line of the
+message, since stack traces and ids make every failure look unique when twenty of them are really
+one bad file type), and **documents needing attention** — failed, plus anything left processing
+for over an hour, because nothing marks those failed; the process that would have is the one that
+died.
+
+Retry is a button, not a timer. Most ingestion failures are deterministic — an unreadable file, a
+document past the model's context — and retrying those on a schedule spends the embedding budget
+rediscovering the same fact. It is worth doing after something was fixed, and only a person knows
+when that happened.
+
+---
+
 ## Agent memory
 
 An agent's own recollection, separate from the document corpus and separate on purpose. They are

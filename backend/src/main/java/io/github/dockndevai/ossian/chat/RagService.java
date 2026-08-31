@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.ingest.IngestionService;
 import io.github.dockndevai.ossian.namespace.NamespaceService;
+import io.github.dockndevai.ossian.observability.PipelineMetrics;
 import io.github.dockndevai.ossian.settings.SettingsService;
 import io.github.dockndevai.ossian.caller.CallerContext;
 
@@ -47,8 +48,10 @@ public class RagService {
 
 	private final NamespaceService namespaces;
 
+	private final PipelineMetrics metrics;
+
 	public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder, OssianProperties properties,
-			CallerContext tenant, QueryLogRepository queryLog, SettingsService settings, NamespaceService namespaces) {
+			CallerContext tenant, QueryLogRepository queryLog, SettingsService settings, NamespaceService namespaces, PipelineMetrics metrics) {
 		this.vectorStore = vectorStore;
 		this.chatClient = chatClientBuilder.build();
 		this.properties = properties;
@@ -56,6 +59,7 @@ public class RagService {
 		this.queryLog = queryLog;
 		this.settings = settings;
 		this.namespaces = namespaces;
+		this.metrics = metrics;
 	}
 
 	/** Retrieves the chunks that should ground an answer. */
@@ -84,8 +88,12 @@ public class RagService {
 		if (!filter.isEmpty()) {
 			request.filterExpression(filter.toString());
 		}
+		long started = System.nanoTime();
 		List<Document> hits = this.vectorStore.similaritySearch(request.build());
-		return (hits == null) ? List.of() : hits;
+		List<Document> found = (hits == null) ? List.of() : hits;
+		this.metrics.retrieval(namespace, found.size(), !found.isEmpty(),
+				java.time.Duration.ofNanos(System.nanoTime() - started));
+		return found;
 	}
 
 	/** Retrieval across every namespace, for callers that do not care which one a fact is in. */

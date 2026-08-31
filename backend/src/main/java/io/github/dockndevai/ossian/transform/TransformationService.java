@@ -15,6 +15,7 @@ import io.github.dockndevai.ossian.document.DocumentContentRepository;
 import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
 import io.github.dockndevai.ossian.ingest.IngestionService;
+import io.github.dockndevai.ossian.observability.PipelineMetrics;
 import io.github.dockndevai.ossian.settings.SettingsService;
 import io.github.dockndevai.ossian.caller.CallerContext;
 import org.slf4j.Logger;
@@ -124,9 +125,11 @@ public class TransformationService {
 
 	private final CacheManager caches;
 
+	private final PipelineMetrics metrics;
+
 	public TransformationService(TransformationRepository transformations, InsightRepository insights,
 			DocumentRepository documents, DocumentContentRepository contents, ChatClient.Builder chatClientBuilder,
-			SettingsService settings, OssianProperties properties, CallerContext caller, CacheManager caches) {
+			SettingsService settings, OssianProperties properties, CallerContext caller, CacheManager caches, PipelineMetrics metrics) {
 		this.transformations = transformations;
 		this.insights = insights;
 		this.documents = documents;
@@ -136,6 +139,7 @@ public class TransformationService {
 		this.properties = properties;
 		this.caller = caller;
 		this.caches = caches;
+		this.metrics = metrics;
 	}
 
 	/** Every transformation, seeding the starter set on first use. */
@@ -283,6 +287,8 @@ public class TransformationService {
 			hit.setFromCache(true);
 			log.debug("transformation '{}' served from cache in {}ms", transformation.getSlug(),
 					hit.getDurationMs());
+			this.metrics.transformation(transformation.getSlug(), true,
+					java.time.Duration.ofMillis(hit.getDurationMs()));
 			return this.insights.save(hit);
 		}
 
@@ -323,6 +329,8 @@ public class TransformationService {
 		insight.setCacheKey(cacheKey);
 		insight.setFromCache(false);
 		Insight saved = this.insights.save(insight);
+		this.metrics.transformation(transformation.getSlug(), false,
+				java.time.Duration.ofMillis(saved.getDurationMs()));
 		remember(cacheKey, saved.getOutput());
 		return saved;
 	}
