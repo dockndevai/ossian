@@ -1,0 +1,29 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ossian.fullname" . }}
+  labels: {{- include "ossian.labels" . | nindent 4 }}
+  annotations: {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts: [{{ .Values.ingress.host | quote }}]
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          # One host, one backend. Everything goes to the frontend, which proxies /api onward —
+          # splitting the path here would put the console and the API on different origins and
+          # reintroduce the CORS problem the nginx proxy exists to avoid.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ossian.fullname" . }}{{ if .Values.frontend.enabled }}-web{{ end }}
+                port:
+                  number: {{ if .Values.frontend.enabled }}80{{ else }}8081{{ end }}
+{{- end }}

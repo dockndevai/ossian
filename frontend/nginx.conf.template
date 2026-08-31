@@ -1,0 +1,42 @@
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    # Hashed assets are immutable; index.html must never be, or a deploy leaves browsers holding
+    # an old shell that requests assets which no longer exist.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    # Single-page app: every unknown path is a client route, not a 404.
+    location / {
+        try_files ${DOLLAR}uri ${DOLLAR}uri/ /index.html;
+    }
+
+    # The API is a separate service in the cluster. Proxying here rather than calling it from the
+    # browser keeps the frontend same-origin, so there is no CORS to configure per environment.
+    location /api/ {
+        # nginx resolves a literal proxy_pass hostname once, at startup, and refuses to start if
+        # it does not resolve. In Kubernetes that means a frontend pod scheduled before the
+        # backend Service exists crash-loops instead of waiting — and a DNS blip takes the pod
+        # down rather than one request. Putting the upstream in a variable defers resolution to
+        # request time, which needs an explicit resolver; the base image writes the cluster's own
+        # into NGINX_LOCAL_RESOLVERS.
+        resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+        set ${DOLLAR}upstream "http://${OSSIAN_API_HOST}";
+        proxy_pass ${DOLLAR}upstream/api/;
+        proxy_set_header Host ${DOLLAR}host;
+        proxy_set_header X-Real-IP ${DOLLAR}remote_addr;
+        proxy_set_header X-Forwarded-For ${DOLLAR}proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+        # Ingestion uploads and streaming answers both outlive the default 60s.
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+    }
+}

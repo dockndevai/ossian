@@ -1,0 +1,105 @@
+# Ossian on Kubernetes.
+#
+# The chart ships the application only. Postgres, Redis, Keycloak and the model gateway are
+# referenced, not deployed: a stateful database packaged inside an application chart gets deleted
+# with `helm uninstall`, and no one means that. Point these at whatever your platform already runs.
+
+image:
+  repository: ghcr.io/dockndevai/ossian-backend
+  tag: ""          # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+frontend:
+  enabled: true
+  image:
+    repository: ghcr.io/dockndevai/ossian-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 2
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits:   { memory: 128Mi }
+
+# Two is the floor for a rolling update that keeps serving. Not an autoscaling target — see the
+# note on the HPA below.
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 500m
+    # Tika holds a whole document in memory while parsing, so the floor is set by the largest
+    # file allowed rather than by steady-state load.
+    memory: 1Gi
+  limits:
+    memory: 2Gi
+
+# Off by default, and deliberately so. Ossian is bound by the embedding endpoint, not by local
+# CPU: under load the pods sit waiting on the gateway at low utilisation, so a CPU-target HPA
+# scales down exactly when the queue is deepest. Scale on queue depth if you scale at all.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 75
+
+postgres:
+  host: postgres
+  port: 5432
+  database: ossian
+  username: ossian
+  # Read from an existing Secret. A password in values.yaml ends up in `helm get values`, in the
+  # release Secret in plain text, and usually in git.
+  existingSecret: ossian-postgres
+  passwordKey: password
+
+redis:
+  host: redis
+  port: 6379
+
+keycloak:
+  issuerUri: http://keycloak:8080/realms/ossian
+
+gateway:
+  # OpenAI-compatible endpoint. Ossian holds no model credentials of its own; the gateway owns
+  # virtual keys, quotas and metering.
+  baseUrl: http://llm-gateway:8080
+  existingSecret: ossian-gateway
+  apiKeyKey: api-key
+  chatModel: qwen2.5:3b
+  embeddingModel: nomic-embed-text
+  embeddingDimensions: 768
+
+ingest:
+  concurrency: 3
+  embeddingTokensPerMinute: 200000
+  embeddingBatchTokens: 8000
+
+rateLimit:
+  keyRequestsPerMinute: 120
+  userRequestsPerMinute: 600
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ossian.example.com
+  tls:
+    enabled: false
+    secretName: ossian-tls
+  annotations:
+    # Uploads are capped at 25MB by the application; the ingress has to agree or it rejects them
+    # first, with a 413 that says nothing about which limit was hit.
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+
+serviceAccount:
+  create: true
+  name: ""
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

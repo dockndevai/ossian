@@ -1,0 +1,13 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ossian.fullname" . }}
+  labels: {{- include "ossian.labels" . | nindent 4 }}
+spec:
+  # Keeps a node drain from taking the last replica with it. Without this, routine maintenance
+  # is an outage rather than a rollout.
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels: {{- include "ossian.selectorLabels" . | nindent 6 }}
+{{- end }}

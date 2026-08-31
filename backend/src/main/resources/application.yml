@@ -97,6 +97,11 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      # Explicit, not inherited. Boot enables the liveness and readiness groups only when it
+      # detects Kubernetes, so relying on that means the probes 404 anywhere detection does not
+      # fire — and a 404 on a liveness probe is a pod that restarts forever.
+      probes:
+        enabled: true
   metrics:
     tags:
       application: ossian

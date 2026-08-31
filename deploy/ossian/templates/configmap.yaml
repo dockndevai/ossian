@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ossian.fullname" . }}
+  labels: {{- include "ossian.labels" . | nindent 4 }}
+data:
+  # Everything here is non-secret configuration. Credentials come from Secrets and are injected
+  # separately, so a ConfigMap dump in a support ticket is harmless.
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://{{ .Values.postgres.host }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}"
+  SPRING_DATASOURCE_USERNAME: {{ .Values.postgres.username | quote }}
+  SPRING_DATA_REDIS_HOST: {{ .Values.redis.host | quote }}
+  SPRING_DATA_REDIS_PORT: {{ .Values.redis.port | quote }}
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: {{ .Values.keycloak.issuerUri | quote }}
+  SPRING_AI_OPENAI_BASE_URL: {{ .Values.gateway.baseUrl | quote }}
+  SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: {{ .Values.gateway.chatModel | quote }}
+  SPRING_AI_OPENAI_EMBEDDING_OPTIONS_MODEL: {{ .Values.gateway.embeddingModel | quote }}
+  SPRING_AI_VECTORSTORE_PGVECTOR_DIMENSIONS: {{ .Values.gateway.embeddingDimensions | quote }}
+  OSSIAN_INGEST_CONCURRENCY: {{ .Values.ingest.concurrency | quote }}
+  OSSIAN_INGEST_EMBEDDINGTOKENSPERMINUTE: {{ .Values.ingest.embeddingTokensPerMinute | quote }}
+  OSSIAN_INGEST_EMBEDDINGBATCHTOKENS: {{ .Values.ingest.embeddingBatchTokens | quote }}
+  OSSIAN_RATELIMIT_KEYREQUESTSPERMINUTE: {{ .Values.rateLimit.keyRequestsPerMinute | quote }}
+  OSSIAN_RATELIMIT_USERREQUESTSPERMINUTE: {{ .Values.rateLimit.userRequestsPerMinute | quote }}
+  # The console is served same-origin through the frontend's nginx, so CORS needs no per-host
+  # configuration. Left empty rather than wildcarded.
+  OSSIAN_CORS_ALLOWEDORIGINS: ""

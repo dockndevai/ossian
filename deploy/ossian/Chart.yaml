@@ -1,0 +1,12 @@
+apiVersion: v2
+name: ossian
+description: RAG for agents — retrieval, memory and an ingestion pipeline you can operate
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/dockndevai/ossian
+sources:
+  - https://github.com/dockndevai/ossian
+maintainers:
+  - name: dockndevai
+    url: https://github.com/dockndevai

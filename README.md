@@ -267,6 +267,66 @@ an agent behaving oddly is usually an agent recalling something stale.
 
 ---
 
+## Kubernetes
+
+```bash
+kubectl create secret generic ossian-postgres --from-literal=password=…
+kubectl create secret generic ossian-gateway  --from-literal=api-key=…
+helm install ossian deploy/ossian --set ingress.host=ossian.example.com --set ingress.enabled=true
+```
+
+The chart ships **the application only**. Postgres, Redis, Keycloak and the model gateway are
+referenced, not deployed — a stateful database packaged inside an application chart is deleted by
+`helm uninstall`, and nobody means that.
+
+Four decisions worth knowing, because each is a failure that only shows up in production:
+
+**Liveness does not check the database.** It checks that the process answers. Pointing it at a
+health group including Postgres turns a brief database blip into every pod being killed at once,
+which is the outage the probe exists to prevent. Readiness *does* include dependencies: a pod that
+cannot reach Postgres should stop taking traffic without being restarted.
+
+**Autoscaling is off, and CPU is the wrong signal.** Ossian is bound by the embedding endpoint,
+not local CPU — under load the pods sit waiting on the gateway at low utilisation, so a CPU-target
+HPA scales *down* exactly when the queue is deepest.
+
+**The grace period is 120 seconds.** Ingestion is asynchronous and a batch takes minutes; a
+shorter one leaves half-embedded documents stuck in `PROCESSING` after every rollout, with nothing
+left running to mark them failed.
+
+**The frontend resolves its upstream at request time.** nginx resolves a literal `proxy_pass`
+hostname once, at startup, and refuses to start if it fails — so a frontend pod scheduled before
+the backend Service exists would crash-loop rather than wait. Verified: with a deliberately
+unresolvable upstream the pod starts and serves the app, and only the API call 502s.
+
+Health probes are enabled explicitly rather than relying on Boot's Kubernetes auto-detection.
+Where that detection does not fire the probe endpoints 404 — and a 404 on liveness is a pod that
+restarts forever.
+
+---
+
+## MCP server
+
+Agents reach Ossian over MCP: [`mcp/`](mcp) publishes as
+[`ossian-mcp`](https://www.npmjs.com/package/ossian-mcp).
+
+```json
+{ "mcpServers": { "ossian": { "command": "ossian-mcp",
+  "env": { "OSSIAN_URL": "http://localhost:8081", "OSSIAN_API_KEY": "osk_…" } } } }
+```
+
+Seven tools: `ask_documents`, `list_namespaces`, `list_documents`, `add_document_from_url`,
+`remember`, `recall`, `forget_session`.
+
+The tool descriptions are unusually explicit about when *not* to use each one. A tool description
+is a prompt — it is the only thing the model reads before choosing — and the failure that matters
+is not a malformed call but a well-formed call to the wrong tool. `ask_documents` returns a
+refusal when the corpus cannot answer, and tells the model to report that rather than falling back
+on general knowledge, because an invented answer presented as company policy is the failure this
+whole system exists to prevent.
+
+---
+
 ## Machine credentials
 
 An agent cannot perform an interactive login, so everything here was unreachable to one. API
