@@ -342,3 +342,18 @@ a.chip { text-decoration: none; }
    than one that is visibly unavailable. */
 .picker.inert select, .picker.inert .picker-add { opacity: .45; cursor: not-allowed; }
 .ns-chip { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); }
+
+/* ---------- agent memory ---------- */
+.agent-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.agent-tabs button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 8px 12px; }
+.agent-tabs button.on { border-color: var(--accent); background: var(--bg); }
+.agent-tabs button.on strong { color: var(--accent); }
+.memories { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
+.memories > li { border: 1px solid var(--line); border-radius: 9px; padding: 12px;
+  background: var(--bg); }
+.memory-text { margin: 0 0 8px; white-space: pre-wrap; }
+.memories .meta { margin: 0; }
+.row-actions { display: flex; gap: 8px; }
+.ask input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); color: var(--ink); font: inherit; }

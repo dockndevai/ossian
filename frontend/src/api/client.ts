@@ -249,6 +249,32 @@ export interface Insight {
   createdAt: string;
 }
 
+export interface Memory {
+  id: string;
+  agentId: string;
+  sessionId: string | null;
+  subject: string | null;
+  kind: string;
+  content: string;
+  metadata: string;
+  importance: number;
+  similarity: number | null;
+  score: number | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  useCount: number;
+  expiresAt: string | null;
+}
+
+export interface AgentSummary {
+  agentId: string;
+  memories: number;
+  sessions: number;
+  subjects: number;
+  expiring: number;
+  newest: string;
+}
+
 export const api = {
   ask: (token: string | undefined, question: string, documentIds?: string[], namespace?: string) =>
     request<AskResponse>(token, "/chat", {
@@ -371,6 +397,24 @@ export const api = {
 
   reindex: (token: string | undefined, id: string) =>
     request<unknown>(token, `/admin/documents/${id}/reindex`, { method: "POST" }),
+
+  agents: (token: string | undefined) => request<AgentSummary[]>(token, "/memory/agents"),
+
+  memories: (token: string | undefined, agentId: string, sessionId?: string) =>
+    request<Memory[]>(
+      token,
+      `/memory?agentId=${encodeURIComponent(agentId)}&limit=200` +
+        (sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : ""),
+    ),
+
+  recall: (token: string | undefined, agentId: string, query: string, minSimilarity = 0) =>
+    request<Memory[]>(token, "/memory/recall", {
+      method: "POST",
+      body: JSON.stringify({ agentId, query, topK: 20, minSimilarity }),
+    }),
+
+  forgetMemory: (token: string | undefined, id: string) =>
+    request<void>(token, `/memory/${id}`, { method: "DELETE" }),
 
   chunks: (token: string | undefined, documentId?: string, namespace?: string, page = 0, size = 50) =>
     request<Page<ChunkView>>(

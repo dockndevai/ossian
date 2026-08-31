@@ -9,6 +9,7 @@ import SettingsPage from "./pages/SettingsPage";
 import EventsPage from "./pages/EventsPage";
 import ApiPage from "./pages/ApiPage";
 import AboutPage from "./pages/AboutPage";
+import MemoryPage from "./pages/MemoryPage";
 import LandingPage from "./pages/LandingPage";
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/explorer" element={<ApiPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/vectors" element={isAdmin ? <VectorsPage /> : <Navigate to="/notebook" replace />} />
+          <Route path="/memory" element={isAdmin ? <MemoryPage /> : <Navigate to="/notebook" replace />} />
           <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/notebook" replace />} />
           <Route path="/settings" element={isAdmin ? <SettingsPage /> : <Navigate to="/notebook" replace />} />
           <Route path="*" element={<Navigate to="/notebook" replace />} />

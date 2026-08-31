@@ -143,6 +143,45 @@ is a model swap that quietly degrades retrieval.
 
 ---
 
+## Agent memory
+
+An agent's own recollection, separate from the document corpus and separate on purpose. They are
+both embedded text, which makes one table tempting and wrong: document retrieval filters on
+namespace, so memories would come back as citations in ordinary answers — "according to [1] the
+user prefers dark mode" is not a fact from your corpus and there would be no way to tell.
+
+```bash
+curl -X POST localhost:8081/api/memory -H "X-API-Key: osk_..." \
+  -H 'Content-Type: application/json' \
+  -d '{"agentId":"support","subject":"user:ankit","kind":"preference",
+       "content":"Ankit prefers British English and no bullet lists.","importance":2.0}'
+
+curl -X POST localhost:8081/api/memory/recall -H "X-API-Key: osk_..." \
+  -H 'Content-Type: application/json' \
+  -d '{"agentId":"support","query":"how should I write to Ankit?","subject":"user:ankit"}'
+```
+
+Three things make it memory rather than a second corpus:
+
+**Recency counts.** For a document the best match is the best answer — a runbook from three years
+ago is as true as one from today. For memory the opposite holds, so ranking is
+`similarity × importance × 0.5^(age / 30 days)`. A half-life rather than a cliff: durable facts
+survive, a stale preference loses to a fresh one.
+
+**Restatement is not new information.** An agent writing what it already knows on every turn
+would bury itself, so identical content in the same scope updates the existing row.
+
+**Some of it should be forgotten.** `ttlSeconds` expires session scratch, and expiry is enforced
+on read as well as by cleanup — a memory that outlives its stated lifetime is worse than one
+never kept.
+
+Scoped by `agentId`, narrowed by `sessionId` or `subject`. Two agents do not read each other's
+recollections. The **Memory** page in the console lists what each agent holds and runs the real
+ranking, so you can see what an agent *would* recall rather than searching the text on screen —
+an agent behaving oddly is usually an agent recalling something stale.
+
+---
+
 ## Machine credentials
 
 An agent cannot perform an interactive login, so everything here was unreachable to one. API

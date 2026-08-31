@@ -28,6 +28,9 @@ export const NAV: { section: string; items: NavItem[] }[] = [
     section: "Inspect",
     items: [
       { to: "/vectors", label: "Vectors", hint: "What the retriever sees", admin: true, scoped: true },
+      // Memory is scoped by agent, not by namespace: an agent's recollection is not part of the
+      // corpus and does not move when the corpus filter does.
+      { to: "/memory", label: "Memory", hint: "What agents remember", admin: true, scoped: false },
       { to: "/admin", label: "Console", hint: "Corpus and retrieval health", admin: true, scoped: true },
     ],
   },

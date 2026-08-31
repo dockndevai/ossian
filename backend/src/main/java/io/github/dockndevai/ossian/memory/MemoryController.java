@@ -79,6 +79,12 @@ public class MemoryController {
 		return found;
 	}
 
+	/** Which agents hold memories. The entry point for an operator who does not know the ids. */
+	@GetMapping("/agents")
+	public List<MemoryService.AgentSummary> agents() {
+		return this.memories.agents();
+	}
+
 	@GetMapping
 	public List<MemoryService.Memory> list(@RequestParam String agentId,
 			@RequestParam(required = false) String sessionId, @RequestParam(defaultValue = "50") int limit) {

@@ -137,6 +137,29 @@ public class MemoryService {
 				agentId, sessionId, sessionId, subject, subject, literal(vector), minSimilarity, topK);
 	}
 
+	/** The agents that hold memories, with what each is carrying. */
+	public List<AgentSummary> agents() {
+		return this.jdbc.query("""
+				select agent_id,
+				       count(*) as total,
+				       count(distinct session_id) as sessions,
+				       count(distinct subject) filter (where subject is not null) as subjects,
+				       max(created_at) as newest,
+				       count(*) filter (where expires_at is not null) as expiring
+				from agent_memories
+				where expires_at is null or expires_at > now()
+				group by agent_id
+				order by max(created_at) desc
+				""", (rs, i) -> new AgentSummary(rs.getString("agent_id"), rs.getLong("total"),
+				rs.getLong("sessions"), rs.getLong("subjects"), rs.getLong("expiring"),
+				rs.getTimestamp("newest").toInstant()));
+	}
+
+	/** One agent's memory at a glance, for an operator deciding whether it knows too much. */
+	public record AgentSummary(String agentId, long memories, long sessions, long subjects, long expiring,
+			Instant newest) {
+	}
+
 	/** Everything this agent holds, newest first — for an operator looking at what it knows. */
 	public List<Memory> list(String agentId, String sessionId, int limit) {
 		return this.jdbc.query("""
