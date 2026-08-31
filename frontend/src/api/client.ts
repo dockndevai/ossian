@@ -123,7 +123,7 @@ export interface ProjectionResult {
  */
 export async function askStream(
   token: string | undefined,
-  body: { question: string; documentIds?: string[] },
+  body: { question: string; documentIds?: string[]; namespace?: string },
   onToken: (chunk: string) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -162,25 +162,110 @@ export async function askStream(
   }
 }
 
+export interface NamespaceView {
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface SettingView {
+  key: string;
+  group: string;
+  label: string;
+  help: string;
+  type: "INT" | "DOUBLE" | "STRING" | "TEXT";
+  min: number | null;
+  max: number | null;
+  requiresReindex: boolean;
+  defaultValue: string;
+  override: string | null;
+  effective: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface EventView {
+  eventId: string;
+  operation: string;
+  externalId: string;
+  namespace: string;
+  source: string | null;
+  documentId: string | null;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface IngestEventRequest {
+  eventId: string;
+  operation: "UPSERT" | "DELETE";
+  externalId: string;
+  namespace?: string;
+  source?: string;
+  filename?: string;
+  contentType?: string;
+  text?: string;
+  contentBase64?: string;
+}
+
+export interface EventResult {
+  eventId: string;
+  status: string;
+  documentId: string | null;
+  message: string | null;
+}
+
 export const api = {
-  ask: (token: string | undefined, question: string, documentIds?: string[]) =>
+  ask: (token: string | undefined, question: string, documentIds?: string[], namespace?: string) =>
     request<AskResponse>(token, "/chat", {
       method: "POST",
-      body: JSON.stringify({ question, documentIds }),
+      body: JSON.stringify({ question, documentIds, namespace }),
     }),
 
-  documents: (token: string | undefined, page = 0) =>
-    request<Page<DocumentView>>(token, `/documents?page=${page}&size=20`),
+  documents: (token: string | undefined, page = 0, namespace?: string) =>
+    request<Page<DocumentView>>(
+      token,
+      `/documents?page=${page}&size=50${namespace ? `&namespace=${encodeURIComponent(namespace)}` : ""}`,
+    ),
 
-  upload: (token: string | undefined, file: File) => {
+  upload: (token: string | undefined, file: File, namespace?: string) => {
     const form = new FormData();
     form.append("file", file);
     return request<{ documentId: string; jobId: string | null; status: string; duplicate: boolean }>(
       token,
-      "/documents",
+      `/documents${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ""}`,
       { method: "POST", body: form },
     );
   },
+
+  namespaces: (token: string | undefined) =>
+    request<NamespaceView[]>(token, "/namespaces"),
+
+  createNamespace: (token: string | undefined, name: string, description?: string) =>
+    request<NamespaceView>(token, "/namespaces", {
+      method: "POST",
+      body: JSON.stringify({ name, description }),
+    }),
+
+  settings: (token: string | undefined) => request<SettingView[]>(token, "/admin/settings"),
+
+  updateSetting: (token: string | undefined, key: string, value: string) =>
+    request<SettingView[]>(token, `/admin/settings/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    }),
+
+  resetSetting: (token: string | undefined, key: string) =>
+    request<SettingView[]>(token, `/admin/settings/${encodeURIComponent(key)}`, { method: "DELETE" }),
+
+  ingestEvents: (token: string | undefined, page = 0) =>
+    request<Page<EventView>>(token, `/events/documents?page=${page}&size=50`),
+
+  sendEvent: (token: string | undefined, event: IngestEventRequest) =>
+    request<EventResult>(token, "/events/documents", {
+      method: "POST",
+      body: JSON.stringify(event),
+    }),
 
   deleteDocument: (token: string | undefined, id: string) =>
     request<void>(token, `/documents/${id}`, { method: "DELETE" }),

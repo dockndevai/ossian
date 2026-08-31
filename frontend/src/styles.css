@@ -57,9 +57,8 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 /* ---------- notebook: sources | thread | cited passage ---------- */
 /* The notebook owns the viewport below the header so the thread scrolls on its own rather than
    dragging the page, which is what makes a long conversation usable. */
-main:has(.notebook) { max-width: none; padding: 0; }
 .notebook { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 0;
-  height: calc(100vh - 57px); }
+  height: 100vh; }
 .notebook:has(.citation-pane) { grid-template-columns: 300px minmax(0, 1fr) 340px; }
 
 .sources { border-right: 1px solid var(--line); background: var(--panel); padding: 16px;
@@ -141,4 +140,73 @@ tr.clickable:hover { background: var(--bg); }
 @media (max-width: 900px) {
   .notebook, .notebook:has(.citation-pane) { grid-template-columns: 1fr; height: auto; }
   .sources, .citation-pane { border: none; border-bottom: 1px solid var(--line); }
+}
+
+/* ---------- shell: left navigation ---------- */
+.shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
+.nav { border-right: 1px solid var(--line); background: var(--panel); padding: 16px 12px;
+  display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh;
+  overflow-y: auto; }
+.brand { font-weight: 700; font-size: 17px; padding: 0 8px; }
+.ns { display: flex; flex-direction: column; gap: 6px; padding: 10px 8px; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 9px; }
+.ns select { width: 100%; }
+.ns-new { display: flex; flex-wrap: wrap; gap: 6px; }
+.ns-new input { flex: 1; min-width: 100px; }
+.ns-new button { padding: 5px 9px; font-size: 12px; }
+.nav nav { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.nav-section h4 { margin: 0 0 6px; padding: 0 8px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted); }
+.nav a { display: flex; flex-direction: column; gap: 1px; padding: 7px 8px; border-radius: 8px;
+  text-decoration: none; color: var(--ink); }
+.nav a:hover { background: var(--bg); }
+.nav a.active { background: var(--accent); color: #fff; }
+.nav a.active .muted { color: rgb(255 255 255 / .8); }
+.account { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 8px;
+  border-top: 1px solid var(--line); }
+.content { min-width: 0; }
+/* Every page except the notebook gets the usual page padding; the notebook manages its own
+   full-height layout. */
+.content > .stack { padding: 20px; max-width: 1100px; margin: 0 auto; }
+
+/* ---------- settings ---------- */
+.settings { display: flex; flex-direction: column; gap: 22px; margin-top: 8px; }
+.setting { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: var(--bg); }
+.setting-head { display: flex; align-items: center; gap: 8px; }
+.setting-head label { font-weight: 600; }
+.setting input, .setting textarea { width: 100%; margin-top: 8px; }
+.setting-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* ---------- forms ---------- */
+.grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;
+  margin-top: 14px; }
+.grid-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 550; }
+.grid-form label input, .grid-form label select, .grid-form label textarea { font-weight: 400; }
+.grid-form .wide { grid-column: 1 / -1; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- api console ---------- */
+.api { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 18px; margin-top: 14px; }
+.api-list { display: flex; flex-direction: column; gap: 14px; }
+.api-list h3 { margin: 0 0 4px; }
+.api-item { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left;
+  border: 1px solid transparent; background: none; padding: 5px 7px; border-radius: 7px; }
+.api-item:hover { background: var(--bg); }
+.api-item.picked { background: var(--bg); border-color: var(--accent); }
+.api-item code { font-size: 11px; }
+.verb { font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 4px; color: #fff;
+  letter-spacing: .03em; }
+.verb.get { background: #15803d; }
+.verb.post { background: #4f46e5; }
+.verb.put { background: #b45309; }
+.verb.delete { background: #b91c1c; }
+.api-detail textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.code-block { background: var(--code); border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px; overflow-x: auto; font-size: 12px; margin: 8px 0 0; white-space: pre-wrap;
+  word-break: break-word; }
+
+@media (max-width: 1000px) {
+  .shell { grid-template-columns: 1fr; }
+  .nav { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
+  .api { grid-template-columns: 1fr; }
 }

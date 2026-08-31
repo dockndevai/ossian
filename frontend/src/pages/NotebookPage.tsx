@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { api, askStream, type Citation, type DocumentView } from "../api/client";
+import { useNamespace } from "../app/NamespaceContext";
 
 /**
  * The notebook: sources on the left, conversation in the middle, the cited passage on the right.
@@ -27,6 +28,7 @@ const POLL_MS = 2500;
 export default function NotebookPage() {
   const auth = useAuth();
   const token = auth.user?.access_token;
+  const { current: namespace } = useNamespace();
 
   const [docs, setDocs] = useState<DocumentView[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -41,16 +43,19 @@ export default function NotebookPage() {
 
   const loadDocs = useCallback(async () => {
     try {
-      const page = await api.documents(token, 0);
+      const page = await api.documents(token, 0, namespace ?? undefined);
       setDocs(page.content);
       return page.content;
     } catch {
       return [];
     }
-  }, [token]);
+  }, [token, namespace]);
 
   useEffect(() => {
     void loadDocs();
+    // Switching namespace changes which sources exist, so a selection made in the old one is
+    // meaningless here.
+    setSelected(new Set());
   }, [loadDocs]);
 
   // Ingestion is asynchronous, so a freshly uploaded source sits at PENDING for a few seconds.
@@ -79,7 +84,7 @@ export default function NotebookPage() {
     setUploadError(null);
     for (const file of Array.from(files)) {
       try {
-        await api.upload(token, file);
+        await api.upload(token, file, namespace ?? undefined);
       } catch (err) {
         setUploadError(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -112,10 +117,10 @@ export default function NotebookPage() {
     try {
       // Stream the prose so the answer appears as it is written, then fetch the same question
       // non-streaming for its citations — the SSE endpoint carries tokens only.
-      await askStream(token, { question: q, documentIds }, (chunk) => {
+      await askStream(token, { question: q, documentIds, namespace: namespace ?? undefined }, (chunk) => {
         setTurns((t) => t.map((turn) => (turn.id === id ? { ...turn, answer: turn.answer + chunk } : turn)));
       });
-      const full = await api.ask(token, q, documentIds);
+      const full = await api.ask(token, q, documentIds, namespace ?? undefined);
       setTurns((t) =>
         t.map((turn) =>
           turn.id === id

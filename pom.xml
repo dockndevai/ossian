@@ -21,6 +21,7 @@
 
   <modules>
     <module>backend</module>
+    <module>clients/java</module>
   </modules>
 
   <properties>

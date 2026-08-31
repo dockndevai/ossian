@@ -140,6 +140,59 @@ is a model swap that quietly degrades retrieval.
 
 ---
 
+## Namespaces
+
+A namespace partitions one tenant's corpus. The tenant is the security boundary and comes from
+the token; a namespace is an organisational one and comes from the request. A user may read
+across their own namespaces and can never read another tenant's, whichever namespace they name.
+
+An unknown namespace resolves to the default rather than erroring. The alternative — a typo
+silently returning an empty corpus — reads as "my documents are gone" and sends people looking
+in the wrong place.
+
+---
+
+## Settings
+
+`/api/admin/settings` exposes the model, retrieval and ingestion tunables. `application.yml`
+supplies the default; a tenant override is stored per tenant and shadows it, so changing a
+retrieval threshold needs neither a redeploy nor agreement from every other tenant in the
+process. Clearing a field restores the default rather than setting an empty value.
+
+Chunk size and overlap apply to documents indexed *afterwards*. Existing chunks keep their old
+shape until reindexed, which is why those two are flagged in the UI.
+
+---
+
+## Event-driven ingestion
+
+`POST /api/events/documents` is for pipelines rather than people — a CDC stream, a webhook, a
+queue consumer:
+
+```bash
+curl -X POST http://localhost:8081/api/events/documents \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"eventId":"crm-4172-v1","operation":"UPSERT","externalId":"crm/4172",
+       "namespace":"default","source":"crm-cdc","text":"..."}'
+```
+
+Three properties follow from that, and they are the design:
+
+- **Idempotent.** `eventId` is caller-assigned and unique per tenant. Redelivery is normal —
+  brokers promise at-least-once and pipelines crash mid-batch — so a repeat returns the
+  original outcome instead of a second document.
+- **Addressed externally.** Documents are keyed by `externalId`, their identity in the source
+  system. An update to row 4172 upstream replaces the chunks made from row 4172; the caller is
+  not expected to remember our UUID.
+- **Batched.** `POST /api/events/documents/batch` takes up to 500 and reports per event. A batch
+  is not a transaction: one bad record must not send the other 499 back to be redelivered.
+
+`clients/java` wraps this. It takes a token supplier rather than a token, because an importer
+outlives the token it started with — a client that captured one at construction works in testing
+and starts failing minutes after deployment.
+
+---
+
 ## Configuration
 
 | Property | Default | Meaning |
@@ -188,12 +241,13 @@ predicates, and a mocked repository would prove nothing about them. Model calls 
 no LLM is required.
 
 ```
-backend/    Spring Boot service
-frontend/   React 19 + Vite + TypeScript
-keycloak/   realm import — users, roles, tenant claim mapper
-gateway/    route override mounted into the spring-llm-gateway image
-docs/       sample corpus to ingest
-scripts/    smoke test against a running stack
+backend/        Spring Boot service
+frontend/       React 19 + Vite + TypeScript
+clients/java/   client library for feeding a corpus from another service
+keycloak/       realm import — users, roles, tenant claim mapper
+gateway/        route override mounted into the spring-llm-gateway image
+docs/           sample corpus to ingest
+scripts/        smoke test against a running stack
 ```
 
 ### Smoke test
