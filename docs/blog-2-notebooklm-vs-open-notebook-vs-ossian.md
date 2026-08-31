@@ -178,3 +178,5 @@ Gemini Notebook: [notebooklm.google.com](https://notebooklm.google.com)*
 *I wrote one of these three, which you should weigh accordingly. Corrections about the other two are
 welcome — the Open Notebook and Gemini Notebook facts here were checked against their own
 documentation in August 2026, and both move quickly.*
+
+*Written with Claude (Anthropic), working in the codebase it describes; every number and code sample was verified against the running system, and the claims about Gemini Notebook and Open Notebook were checked against their own documentation. Reviewed and published by [@dockndevai](https://github.com/dockndevai).*

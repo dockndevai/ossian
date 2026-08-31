@@ -209,3 +209,5 @@ means grounding has broken.
 *Ossian is Apache-2.0 at [github.com/dockndevai/ossian](https://github.com/dockndevai/ossian).
 Issues and disagreement welcome — particularly about the refusal threshold, which is the setting
 most likely to be wrong for your corpus.*
+
+*Written with Claude (Anthropic), working in the codebase it describes; every number and code sample here was verified against the running system. Reviewed and published by [@dockndevai](https://github.com/dockndevai).*
