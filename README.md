@@ -39,6 +39,86 @@ token quotas and metering. Point `LLM_BASE_URL` straight at Ollama to cut it out
 
 ---
 
+## A tour
+
+### Ask, and get the passage the answer came from
+
+![The notebook: a grounded answer with an inline citation, sources on the left](docs/media/demo/01-notebook.png)
+
+Sources on the left, conversation in the middle. The `[1]` in the answer is a link to the passage
+it came from, and the chips below carry each source's similarity score. `grounded` means the
+answer was written from retrieved text; the alternative is the refusal below.
+
+Ask something the corpus does not cover and you get **"I could not find anything about that in
+your documents"** — and the model is never called. That is the feature, not a failure. Those
+refusals are recorded, and the **Gaps** list is the most useful ingestion backlog anyone has
+handed a documentation team.
+
+### See what the retriever sees
+
+![The vector store: every chunk with dimensions, norm and an embedding sparkline](docs/media/demo/02-vectors.png)
+
+Every stored chunk, its dimensions and norm, and a sparkline of the embedding itself. Note
+`platform-architecture.md` split into eleven ~450-character chunks while the handbooks stayed
+whole — that is per-namespace chunking, because a runbook answers best in short passages and a
+handbook does not.
+
+There is also a retrieval playground that runs a query **with no model in the loop**. Retrieval
+failures and generation failures look identical from the outside and have opposite fixes; if the
+right passage is at the top here, the retriever is fine and the model is your problem.
+
+### Give an agent a memory
+
+![Agent memory: three agents, and a recall ranked by score](docs/media/demo/03-memory.png)
+
+Separate from the corpus on purpose — memories surfacing as citations in a policy answer would be
+indistinguishable from the policy. Ranked by `similarity × importance × 0.5^(age / 30 days)`: the
+preference at importance 2.0 scores **1.264** from a similarity of 0.636, which is what pushes it
+above an equally relevant fact.
+
+Recency matters for memory in a way it never does for documents. A runbook from three years ago is
+as true as one from today; a stated preference from three years ago is not.
+
+### Watch ingestion, and see who did what
+
+![The console: ingestion throughput and an append-only audit trail](docs/media/demo/04-console.png)
+
+Throughput, success rate and p95 — the tail is what people wait on, and an average hides one
+document taking a minute behind fifty taking a second. **Needs attention** catches failures *and*
+anything left processing for over an hour, because nothing marks those failed: the process that
+would have is the one that died. Failures are grouped by cause, since twenty instances of one bad
+file type is one problem, not twenty.
+
+Below it, an append-only audit trail recording the actor as presented at the time — `admin` or
+`key:nightly-import` — never a reference to a user who may since have left.
+
+### Tune it without a redeploy
+
+![Settings: model, retrieval and ingestion tunables with their defaults](docs/media/demo/05-settings.png)
+
+Model, temperature, chunk size, overlap, how many passages and how good a match has to be. The two
+that need a re-index say so, because chunking changes are not retroactive and silently mixing two
+strategies in one corpus is worse than a stale one.
+
+### Feed it from a pipeline
+
+![Imports: event-driven ingestion with a delivery feed](docs/media/demo/06-imports.png)
+
+An event API for CDC streams and webhooks, idempotent on a caller-assigned event id — at-least-once
+delivery is the normal case, and a pipeline that resends after a crash should not produce a second
+copy.
+
+### And what a first-time visitor sees
+
+![The landing page](docs/media/demo/07-landing.png)
+
+Everything above is reproducible in about five minutes — see **Quick start** below, then
+`./scripts/smoke.sh`, which ingests the sample corpus and asks five questions. The fifth is
+deliberately unanswerable from it: an answer to that one means grounding has broken, which is the
+single failure worth watching for.
+
+---
+
 ## Quick start
 
 The gateway ships as a container image. Build it once from the

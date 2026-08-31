@@ -1,0 +1,19 @@
+Acme Corp Engineering Onboarding
+
+Day one. Every new joiner gets a laptop configured before they arrive, a buddy from their own
+team, and a 30-day checklist owned by their manager. The buddy is not the manager and is not
+expected to be technical support; the point is somebody to ask the questions nobody writes down.
+
+Accounts. Access is granted by team membership rather than individually, so joining a team grants
+what that team has and leaving revokes it. Requests for individual exceptions go through the
+engineering manager and are reviewed quarterly.
+
+First contribution. The expectation is a merged change in the first week. It is deliberately not
+expected to be significant — the goal is to prove the path from a local checkout to production
+works and that somebody will review your code, not to deliver anything.
+
+Training budget. Every engineer has an annual budget of 60,000 INR for courses, books and
+conferences, and two working days a month for learning. Unused budget does not carry over.
+
+Probation. Six months, with a written review at three. Nothing in the review should ever be a
+surprise; if it is, the manager has already failed.
