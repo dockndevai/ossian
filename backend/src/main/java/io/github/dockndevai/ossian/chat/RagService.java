@@ -10,6 +10,7 @@ import reactor.core.publisher.Flux;
 
 import io.github.dockndevai.ossian.config.OssianProperties;
 import io.github.dockndevai.ossian.ingest.IngestionService;
+import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.settings.SettingsService;
 import io.github.dockndevai.ossian.tenant.TenantContext;
 
@@ -44,14 +45,17 @@ public class RagService {
 
 	private final SettingsService settings;
 
+	private final NamespaceService namespaces;
+
 	public RagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder, OssianProperties properties,
-			TenantContext tenant, QueryLogRepository queryLog, SettingsService settings) {
+			TenantContext tenant, QueryLogRepository queryLog, SettingsService settings, NamespaceService namespaces) {
 		this.vectorStore = vectorStore;
 		this.chatClient = chatClientBuilder.build();
 		this.properties = properties;
 		this.tenant = tenant;
 		this.queryLog = queryLog;
 		this.settings = settings;
+		this.namespaces = namespaces;
 	}
 
 	/** Retrieves the chunks that should ground an answer, scoped to the tenant. */
@@ -60,10 +64,11 @@ public class RagService {
 		// tenant; nothing can widen past it.
 		StringBuilder filter = new StringBuilder(
 				"%s == '%s'".formatted(IngestionService.META_TENANT, this.tenant.tenantId()));
-		if (namespace != null && !namespace.isBlank()) {
-			filter.append(" && %s == '%s'".formatted(IngestionService.META_NAMESPACE,
-					io.github.dockndevai.ossian.namespace.NamespaceEntity.slug(namespace)));
-		}
+		// Asked of the namespace service rather than taken from the parameter, because a confined
+		// credential has a namespace even when the request names none. Reading the parameter
+		// directly is what let a confined key retrieve the whole corpus.
+		this.namespaces.effectiveFilter(namespace)
+			.ifPresent(ns -> filter.append(" && %s == '%s'".formatted(IngestionService.META_NAMESPACE, ns)));
 		if (documentIds != null && !documentIds.isEmpty()) {
 			String ids = documentIds.stream().filter(Objects::nonNull).map(id -> "'" + id + "'")
 				.reduce((a, b) -> a + "," + b).orElse("");

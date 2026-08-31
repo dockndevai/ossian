@@ -7,7 +7,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.dockndevai.ossian.namespace.NamespaceEntity;
+import io.github.dockndevai.ossian.namespace.NamespaceService;
 import io.github.dockndevai.ossian.tenant.TenantContext;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -76,10 +76,13 @@ public class VectorController {
 
 	private final ObjectMapper json = new ObjectMapper();
 
-	public VectorController(JdbcTemplate jdbc, EmbeddingModel embeddings, TenantContext tenant) {
+	private final NamespaceService namespaces;
+
+	public VectorController(JdbcTemplate jdbc, EmbeddingModel embeddings, TenantContext tenant, NamespaceService namespaces) {
 		this.jdbc = jdbc;
 		this.embeddings = embeddings;
 		this.tenant = tenant;
+		this.namespaces = namespaces;
 	}
 
 	/** The chunks themselves, optionally narrowed to one document. */
@@ -94,9 +97,10 @@ public class VectorController {
 		StringBuilder where = new StringBuilder("where metadata->>'tenant_id' = ?");
 		List<Object> args = new ArrayList<>();
 		args.add(t);
-		if (namespace != null && !namespace.isBlank()) {
+		var confined = this.namespaces.effectiveFilter(namespace);
+		if (confined.isPresent()) {
 			where.append(" and metadata->>'namespace' = ?");
-			args.add(NamespaceEntity.slug(namespace));
+			args.add(confined.get());
 		}
 		if (documentId != null && !documentId.isBlank()) {
 			where.append(" and metadata->>'document_id' = ?");
@@ -135,8 +139,7 @@ public class VectorController {
 		String literal = toLiteral(vector);
 		// A null namespace matches every namespace: the clause is written so one bound parameter
 		// serves both cases rather than branching the SQL.
-		String ns = (request.namespace() == null || request.namespace().isBlank()) ? null
-				: NamespaceEntity.slug(request.namespace());
+		String ns = this.namespaces.effectiveFilter(request.namespace()).orElse(null);
 
 		List<NeighbourView> neighbours = this.jdbc.query("""
 				select id::text, content, metadata::text, 1 - (embedding <=> ?::vector) as similarity
@@ -165,7 +168,7 @@ public class VectorController {
 	public ProjectionResult projection(@RequestParam(defaultValue = "500") int limit,
 			@RequestParam(required = false) String namespace) {
 		int cap = Math.min(Math.max(limit, 1), 2000);
-		String ns = (namespace == null || namespace.isBlank()) ? null : NamespaceEntity.slug(namespace);
+		String ns = this.namespaces.effectiveFilter(namespace).orElse(null);
 		record Row(String id, String filename, String excerpt, float[] embedding) {
 		}
 

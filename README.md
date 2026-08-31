@@ -140,6 +140,46 @@ is a model swap that quietly degrades retrieval.
 
 ---
 
+## Machine credentials
+
+An agent cannot perform an interactive login, so everything here was unreachable to one. API
+keys close that.
+
+```bash
+# issue one (admin)
+curl -X POST localhost:8081/api/admin/api-keys \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"support-agent","roles":["ossian-user"],"namespace":"hr-policies"}'
+
+# then, with no human anywhere
+curl -X POST localhost:8081/api/chat \
+  -H "X-API-Key: osk_..." -H 'Content-Type: application/json' \
+  -d '{"question":"what do new joiners get on day one?"}'
+```
+
+Accepted in `X-API-Key` or as `Authorization: Bearer`. Only the SHA-256 hash is stored and the
+secret is returned once — there is no endpoint that reveals an existing key, because a system
+where an administrator can read out a tenant's credentials is one where whoever reaches the
+administrator can too.
+
+A key carries its own roles, usually fewer than the person who issued it: an ingestion pipeline
+needs to write documents, not administer the tenant. It can also be **confined to a namespace**,
+so a leaked pipeline key cannot read the rest of the corpus. Confinement is enforced where the
+namespace is chosen, not at the edge — listing, retrieval, the vector endpoints and the console
+statistics all ask `NamespaceService` for the effective filter rather than reading the request
+parameter, because for a confined credential there is no such thing as "no filter". Naming a
+different namespace is a 403 rather than a silent redirect: a pipeline writing to the wrong place
+and being told nothing looks like it worked.
+
+| | user token | API key |
+|---|---|---|
+| tenant from | `tenant` claim | the key's row |
+| roles from | `realm_access.roles` | the key's roles |
+| namespace | any in the tenant | all, or exactly one |
+| revocable | via Keycloak | immediately, and the row is kept |
+
+---
+
 ## Caching
 
 Three caches, with different lifetimes because what makes a hit stale differs.

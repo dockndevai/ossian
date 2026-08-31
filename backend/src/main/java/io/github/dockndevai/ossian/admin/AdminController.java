@@ -93,13 +93,14 @@ public class AdminController {
 	@GetMapping("/stats/corpus")
 	public CorpusStats corpus(@RequestParam(required = false) String namespace) {
 		String t = this.tenant.tenantId();
-		if (namespace == null || namespace.isBlank()) {
+		var scope = this.namespaces.effectiveFilter(namespace);
+		if (scope.isEmpty()) {
 			return new CorpusStats(this.documents.countByTenantId(t),
 					this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.READY),
 					this.documents.countByTenantIdAndStatus(t, DocumentEntity.Status.FAILED),
 					this.documents.sumChunksByTenantId(t), this.documents.sumBytesByTenantId(t));
 		}
-		String ns = this.namespaces.resolve(namespace);
+		String ns = scope.get();
 		return new CorpusStats(this.documents.countByTenantIdAndNamespace(t, ns),
 				this.documents.countByTenantIdAndNamespaceAndStatus(t, ns, DocumentEntity.Status.READY),
 				this.documents.countByTenantIdAndNamespaceAndStatus(t, ns, DocumentEntity.Status.FAILED),
@@ -115,14 +116,15 @@ public class AdminController {
 	public RetrievalStats retrieval(@RequestParam(required = false) String namespace) {
 		String t = this.tenant.tenantId();
 		Instant since = Instant.now().minus(7, ChronoUnit.DAYS);
-		if (namespace == null || namespace.isBlank()) {
+		var scope = this.namespaces.effectiveFilter(namespace);
+		if (scope.isEmpty()) {
 			long asked = this.queryLog.countByTenantIdAndCreatedAtAfter(t, since);
 			long unanswered = this.queryLog.countByTenantIdAndAnsweredFalseAndCreatedAtAfter(t, since);
 			Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
 			return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(t, since),
 					this.queryLog.avgTopScore(t, since));
 		}
-		String ns = this.namespaces.resolve(namespace);
+		String ns = scope.get();
 		long asked = this.queryLog.countByTenantIdAndNamespaceAndCreatedAtAfter(t, ns, since);
 		long unanswered = this.queryLog.countByTenantIdAndNamespaceAndAnsweredFalseAndCreatedAtAfter(t, ns, since);
 		Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
@@ -134,10 +136,9 @@ public class AdminController {
 	@GetMapping("/gaps")
 	public List<GapView> gaps(@RequestParam(required = false) String namespace) {
 		String t = this.tenant.tenantId();
-		List<QueryLog> rows = (namespace == null || namespace.isBlank())
-				? this.queryLog.findTop50ByTenantIdAndAnsweredFalseOrderByCreatedAtDesc(t)
-				: this.queryLog.findTop50ByTenantIdAndNamespaceAndAnsweredFalseOrderByCreatedAtDesc(t,
-						this.namespaces.resolve(namespace));
+		List<QueryLog> rows = this.namespaces.effectiveFilter(namespace)
+			.map(ns -> this.queryLog.findTop50ByTenantIdAndNamespaceAndAnsweredFalseOrderByCreatedAtDesc(t, ns))
+			.orElseGet(() -> this.queryLog.findTop50ByTenantIdAndAnsweredFalseOrderByCreatedAtDesc(t));
 		return rows.stream().map(GapView::of).toList();
 	}
 

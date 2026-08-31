@@ -2,6 +2,8 @@ package io.github.dockndevai.ossian.config;
 
 import java.util.List;
 
+import io.github.dockndevai.ossian.apikey.ApiKeyAuthenticationFilter;
+import io.github.dockndevai.ossian.apikey.ApiKeyService;
 import io.github.dockndevai.ossian.tenant.TenantContext;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -12,6 +14,9 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -36,7 +41,8 @@ public class SecurityConfig {
 	 */
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http,
-			@Qualifier("corsConfigurationSource") CorsConfigurationSource cors) throws Exception {
+			@Qualifier("corsConfigurationSource") CorsConfigurationSource cors, ApiKeyService apiKeys)
+			throws Exception {
 		return http
 			.cors(c -> c.configurationSource(cors))
 			// No cookies, no sessions: nothing for a forged request to ride on.
@@ -49,8 +55,32 @@ public class SecurityConfig {
 				// Everything that touches documents or the retrieval layer needs a token.
 				.requestMatchers("/api/admin/**").hasRole("ossian-admin")
 				.anyRequest().authenticated())
-			.oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter())))
+			.oauth2ResourceServer(oauth -> oauth
+				// Without this the resource server still resolves an "Authorization: Bearer osk_..."
+				// header, fails to decode it as a JWT, and returns 401 over the top of the
+				// authentication the key filter already established.
+				.bearerTokenResolver(jwtOnlyResolver())
+				.jwt(jwt -> jwt.jwtAuthenticationConverter(converter())))
+			// Before the bearer-token filter, and only acts on credentials starting with osk_.
+			// A Keycloak token passes straight through to the resource server, so nothing about
+			// how people sign in changes.
+			.addFilterBefore(new ApiKeyAuthenticationFilter(apiKeys), BearerTokenAuthenticationFilter.class)
 			.build();
+	}
+
+	/**
+	 * Resolves bearer tokens for the OAuth2 resource server, except ours.
+	 *
+	 * <p>API keys are accepted in the Authorization header because most HTTP clients expect
+	 * credentials there. Returning null for them tells the resource server there is no token to
+	 * decode, leaving the authentication the key filter already set in place.
+	 */
+	private BearerTokenResolver jwtOnlyResolver() {
+		DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
+		return request -> {
+			String token = delegate.resolve(request);
+			return (token != null && token.startsWith(ApiKeyService.PREFIX)) ? null : token;
+		};
 	}
 
 	private JwtAuthenticationConverter converter() {

@@ -84,11 +84,12 @@ public class DocumentController {
 			@RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String namespace) {
 		PageRequest pageable = PageRequest.of(page, Math.min(size, 100));
 		// No namespace means every namespace this tenant has — an absent filter widens within the
-		// tenant, never past it.
-		return ((namespace == null || namespace.isBlank())
-				? this.documents.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId(), pageable)
-				: this.documents.findByTenantIdAndNamespaceOrderByCreatedAtDesc(this.tenant.tenantId(),
-						this.namespaces.resolve(namespace), pageable))
+		// tenant, never past it. A confined credential is the exception: for it there is no such
+		// thing as "no filter", which is why this asks rather than testing the parameter.
+		return this.namespaces.effectiveFilter(namespace)
+			.map(ns -> this.documents.findByTenantIdAndNamespaceOrderByCreatedAtDesc(this.tenant.tenantId(), ns,
+					pageable))
+			.orElseGet(() -> this.documents.findByTenantIdOrderByCreatedAtDesc(this.tenant.tenantId(), pageable))
 			.map(DocumentView::of);
 	}
 
