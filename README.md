@@ -307,23 +307,24 @@ restarts forever.
 
 ## MCP server
 
-Agents reach Ossian over MCP: [`mcp/`](mcp) publishes as
+Agents reach Ossian over MCP. The server lives in its own repository —
+[dockndevai/ossian-mcp](https://github.com/dockndevai/ossian-mcp) — and publishes as
 [`ossian-mcp`](https://www.npmjs.com/package/ossian-mcp).
+
+```bash
+npm install -g ossian-mcp
+```
 
 ```json
 { "mcpServers": { "ossian": { "command": "ossian-mcp",
   "env": { "OSSIAN_URL": "http://localhost:8081", "OSSIAN_API_KEY": "osk_…" } } } }
 ```
 
+Issue the key from **Console → API keys**, and give it the narrowest scope that works — confined
+to a namespace, a key that leaks reads only what that agent was for.
+
 Seven tools: `ask_documents`, `list_namespaces`, `list_documents`, `add_document_from_url`,
 `remember`, `recall`, `forget_session`.
-
-The tool descriptions are unusually explicit about when *not* to use each one. A tool description
-is a prompt — it is the only thing the model reads before choosing — and the failure that matters
-is not a malformed call but a well-formed call to the wrong tool. `ask_documents` returns a
-refusal when the corpus cannot answer, and tells the model to report that rather than falling back
-on general knowledge, because an invented answer presented as company policy is the failure this
-whole system exists to prevent.
 
 ---
 
