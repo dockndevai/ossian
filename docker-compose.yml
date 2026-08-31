@@ -1,4 +1,4 @@
-# Local infrastructure for Openbook.
+# Local infrastructure for Ossian.
 #
 #   docker compose up -d
 #   docker compose exec ollama ollama pull nomic-embed-text
@@ -10,24 +10,24 @@ services:
   postgres:
     # pgvector build of Postgres: the extension is present, so Flyway's CREATE EXTENSION works.
     image: pgvector/pgvector:pg17
-    container_name: openbook-postgres
+    container_name: ossian-postgres
     environment:
-      POSTGRES_DB: openbook
-      POSTGRES_USER: openbook
-      POSTGRES_PASSWORD: openbook
+      POSTGRES_DB: ossian
+      POSTGRES_USER: ossian
+      POSTGRES_PASSWORD: ossian
     ports:
       - "5433:5432"
     volumes:
-      - openbook-pgdata:/var/lib/postgresql/data
+      - ossian-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openbook -d openbook"]
+      test: ["CMD-SHELL", "pg_isready -U ossian -d ossian"]
       interval: 5s
       timeout: 3s
       retries: 20
 
   redis:
     image: redis:7-alpine
-    container_name: openbook-redis
+    container_name: ossian-redis
     ports:
       - "6380:6379"
     command: ["redis-server", "--save", "", "--appendonly", "no"]
@@ -39,7 +39,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    container_name: openbook-keycloak
+    container_name: ossian-keycloak
     # Imports a ready-made realm so auth works on first boot: no manual clicking to create
     # a realm, client, roles, tenant mapper and test users.
     command: ["start-dev", "--import-realm"]
@@ -58,8 +58,8 @@ services:
       retries: 30
       start_period: 30s
 
-  # The LLM gateway. Openbook speaks the OpenAI protocol to this, and it owns routing,
-  # virtual keys, per-tenant token quotas, usage metering and failover -- so Openbook holds
+  # The LLM gateway. Ossian speaks the OpenAI protocol to this, and it owns routing,
+  # virtual keys, per-tenant token quotas, usage metering and failover -- so Ossian holds
   # no upstream model credentials of its own.
   #
   # Build the image once from https://github.com/dockndevai/spring-llm-gateway:
@@ -67,7 +67,7 @@ services:
   # Or set LLM_BASE_URL=http://ollama:11434 on the backend to cut it out entirely.
   llm-gateway:
     image: spring-llm-gateway:0.1.0
-    container_name: openbook-llm-gateway
+    container_name: ossian-llm-gateway
     depends_on:
       ollama:
         condition: service_started
@@ -93,11 +93,11 @@ services:
   # Models behind the gateway.
   ollama:
     image: ollama/ollama:latest
-    container_name: openbook-ollama
+    container_name: ossian-ollama
     ports:
       - "11435:11434"
     volumes:
-      - openbook-ollama:/root/.ollama
+      - ossian-ollama:/root/.ollama
     healthcheck:
       test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 10s
@@ -105,5 +105,5 @@ services:
       retries: 10
 
 volumes:
-  openbook-pgdata:
-  openbook-ollama:
+  ossian-pgdata:
+  ossian-ollama:

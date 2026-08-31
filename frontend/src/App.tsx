@@ -22,7 +22,7 @@ export default function App() {
   if (!auth.isAuthenticated) {
     return (
       <div className="centered">
-        <h1>Openbook</h1>
+        <h1>Ossian</h1>
         <p className="muted">Answers from your own documents, with citations.</p>
         <button className="primary" onClick={() => void auth.signinRedirect()}>
           Sign in with Keycloak
@@ -35,13 +35,13 @@ export default function App() {
   // This is presentation only — the backend enforces the same rule independently.
   const roles: string[] = (auth.user?.profile as never as { realm_access?: { roles?: string[] } })
     ?.realm_access?.roles ?? [];
-  const isAdmin = roles.includes("openbook-admin");
+  const isAdmin = roles.includes("ossian-admin");
   const tenant = (auth.user?.profile as never as { tenant?: string })?.tenant ?? "default";
 
   return (
     <>
       <header>
-        <strong>Openbook</strong>
+        <strong>Ossian</strong>
         <nav>
           <NavLink to="/chat">Ask</NavLink>
           <NavLink to="/documents">Documents</NavLink>

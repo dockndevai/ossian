@@ -2,7 +2,7 @@
 # infrastructure containers are up.  ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 logging:
   level:
-    io.github.dockndevai.openbook: DEBUG
+    io.github.dockndevai.ossian: DEBUG
     org.springframework.ai.vectorstore: DEBUG
 spring:
   jpa:

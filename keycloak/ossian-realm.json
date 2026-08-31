@@ -1,0 +1,98 @@
+{
+  "realm": "ossian",
+  "enabled": true,
+  "displayName": "Ossian",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "accessTokenLifespan": 1800,
+  "roles": {
+    "realm": [
+      { "name": "ossian-user",  "description": "Ask questions and upload documents" },
+      { "name": "ossian-admin", "description": "Ingestion jobs, re-indexing and retrieval metrics" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ossian-frontend",
+      "name": "Ossian Web Console",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:4173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:4173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://localhost:4173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant",
+            "claim.name": "tenant",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "ossian-frontend",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@ossian.local",
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "attributes": { "tenant": ["acme"] },
+      "credentials": [ { "type": "password", "value": "admin", "temporary": false } ],
+      "realmRoles": [ "ossian-user", "ossian-admin" ]
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "user@ossian.local",
+      "firstName": "Uma",
+      "lastName": "User",
+      "attributes": { "tenant": ["acme"] },
+      "credentials": [ { "type": "password", "value": "user", "temporary": false } ],
+      "realmRoles": [ "ossian-user" ]
+    },
+    {
+      "username": "other",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "other@ossian.local",
+      "firstName": "Otto",
+      "lastName": "Othertenant",
+      "attributes": { "tenant": ["globex"] },
+      "credentials": [ { "type": "password", "value": "other", "temporary": false } ],
+      "realmRoles": [ "ossian-user", "ossian-admin" ]
+    }
+  ]
+}

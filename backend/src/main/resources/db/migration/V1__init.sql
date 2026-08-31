@@ -1,4 +1,4 @@
--- Openbook initial schema.
+-- Ossian initial schema.
 --
 -- Two stores in one database: relational tables here for documents and jobs, and a pgvector
 -- table for the embeddings. Keeping them together means a document and its chunks can be

@@ -1,4 +1,4 @@
-# Openbook
+# Ossian
 
 Answers from **your own documents**, with citations you can check — plus the maintenance side
 that keeps retrieval honest over time.
@@ -27,7 +27,7 @@ React 19 + Vite            Spring Boot 3.5                 Postgres 17
 ┌──────────────┐                    │ OpenAI-compatible
 │  Keycloak    │                    ▼
 │  realm:      │          ┌────────────────────┐   virtual keys, token quotas,
-│  openbook    │          │ spring-llm-gateway │   usage metering, failover
+│  ossian    │          │ spring-llm-gateway │   usage metering, failover
 └──────────────┘          └─────────┬──────────┘
                                     ▼
                             Ollama / vLLM / NVIDIA
@@ -110,7 +110,7 @@ response doesn't even confirm the document exists.
 
 ### Retrieval refuses rather than guesses
 
-Below `openbook.retrieval.similarity-threshold` (default 0.5) the service returns "not in your
+Below `ossian.retrieval.similarity-threshold` (default 0.5) the service returns "not in your
 documents" without calling the model at all. An open-book system that invents an answer is worse
 than one that admits the gap — and those refusals are recorded, which is what powers the
 coverage-gaps screen.
@@ -139,13 +139,13 @@ is a model swap that quietly degrades retrieval.
 
 | Property | Default | Meaning |
 |---|---|---|
-| `openbook.ingest.chunk-size` | `1200` | Characters per chunk |
-| `openbook.ingest.chunk-overlap` | `200` | Overlap so facts spanning a boundary stay findable |
-| `openbook.ingest.max-file-size` | `25 MB` | Upload limit |
-| `openbook.retrieval.top-k` | `6` | Chunks per question |
-| `openbook.retrieval.similarity-threshold` | `0.5` | Below this, refuse to answer |
-| `openbook.retrieval.cache-seconds` | `300` | Retrieval cache TTL |
-| `openbook.chat.system-prompt` | see config | Instruction that enforces citation and refusal |
+| `ossian.ingest.chunk-size` | `1200` | Characters per chunk |
+| `ossian.ingest.chunk-overlap` | `200` | Overlap so facts spanning a boundary stay findable |
+| `ossian.ingest.max-file-size` | `25 MB` | Upload limit |
+| `ossian.retrieval.top-k` | `6` | Chunks per question |
+| `ossian.retrieval.similarity-threshold` | `0.5` | Below this, refuse to answer |
+| `ossian.retrieval.cache-seconds` | `300` | Retrieval cache TTL |
+| `ossian.chat.system-prompt` | see config | Instruction that enforces citation and refusal |
 | `LLM_BASE_URL` | `http://localhost:8080` | OpenAI-compatible endpoint |
 | `LLM_EMBED_MODEL` / `LLM_EMBED_DIMENSIONS` | `nomic-embed-text` / `768` | Must agree |
 

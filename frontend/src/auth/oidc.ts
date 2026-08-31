@@ -2,7 +2,7 @@ import type { AuthProviderProps } from "react-oidc-context";
 import { WebStorageStateStore } from "oidc-client-ts";
 
 const url = import.meta.env.VITE_KEYCLOAK_URL ?? "http://localhost:8180";
-const realm = import.meta.env.VITE_KEYCLOAK_REALM ?? "openbook";
+const realm = import.meta.env.VITE_KEYCLOAK_REALM ?? "ossian";
 
 /**
  * Authorization Code + PKCE against Keycloak. The client is public, so there is no secret in
@@ -13,7 +13,7 @@ const realm = import.meta.env.VITE_KEYCLOAK_REALM ?? "openbook";
  */
 export const oidcConfig: AuthProviderProps = {
   authority: `${url}/realms/${realm}`,
-  client_id: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? "openbook-frontend",
+  client_id: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? "ossian-frontend",
   redirect_uri: window.location.origin,
   post_logout_redirect_uri: window.location.origin,
   response_type: "code",

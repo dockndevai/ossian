@@ -4,12 +4,12 @@ server:
 
 spring:
   application:
-    name: openbook
+    name: ossian
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:openbook}
-    username: ${DB_USER:openbook}
-    password: ${DB_PASSWORD:openbook}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:ossian}
+    username: ${DB_USER:ossian}
+    password: ${DB_PASSWORD:ossian}
     hikari:
       maximum-pool-size: 15
 
@@ -41,7 +41,7 @@ spring:
         jwt:
           # Keycloak realm. Signature, issuer and expiry are validated here; what a token is
           # allowed to do is decided by roles and the tenant claim.
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/openbook}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/ossian}
 
   ai:
     openai:
@@ -55,7 +55,7 @@ spring:
           temperature: 0.1
       embedding:
         options:
-          # Must match openbook.vectorstore dimensions below. nomic-embed-text is 768.
+          # Must match ossian.vectorstore dimensions below. nomic-embed-text is 768.
           model: ${LLM_EMBED_MODEL:nomic-embed-text}
     vectorstore:
       pgvector:
@@ -66,7 +66,7 @@ spring:
         # dimension error, which is the good case; the bad case is silently poor retrieval.
         dimensions: ${LLM_EMBED_DIMENSIONS:768}
 
-openbook:
+ossian:
   ingest:
     chunk-size: 1200
     chunk-overlap: 200
@@ -95,7 +95,7 @@ management:
       show-details: when_authorized
   metrics:
     tags:
-      application: openbook
+      application: ossian
 
 springdoc:
   swagger-ui:
@@ -103,5 +103,5 @@ springdoc:
 
 logging:
   level:
-    io.github.dockndevai.openbook: INFO
+    io.github.dockndevai.ossian: INFO
     org.springframework.ai: INFO
