@@ -1,0 +1,15 @@
+Acme Corp Customer Support Runbook
+
+Refunds. Enterprise customers may request a refund within 30 days of the invoice date.
+Self-serve customers have a 14 day window. Refunds after the window need finance approval and
+are issued as account credit, not to the original payment method.
+
+Escalation. First response is due within 4 business hours for enterprise and 1 business day
+for self-serve. If a ticket is untouched for 2 business days it escalates to the support lead
+automatically.
+
+Data export requests. A customer may request a full export of their data at any time. Export
+is delivered within 7 days as newline-delimited JSON over a signed URL that expires in 72 hours.
+
+Account deletion. Deletion requests are honoured within 30 days. Backups are purged on the
+normal 90 day rotation, which is disclosed in the privacy policy.

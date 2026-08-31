@@ -191,7 +191,27 @@ no LLM is required.
 backend/    Spring Boot service
 frontend/   React 19 + Vite + TypeScript
 keycloak/   realm import — users, roles, tenant claim mapper
+gateway/    route override mounted into the spring-llm-gateway image
+docs/       sample corpus to ingest
+scripts/    smoke test against a running stack
 ```
+
+### Smoke test
+
+`./mvnw verify` proves the code. This proves the deployment — it runs against whatever is
+actually up, so it catches the wiring that unit tests cannot: a wrong base URL, a model the
+gateway has no route for, a realm that did not import.
+
+```bash
+./scripts/smoke.sh
+```
+
+It signs in to Keycloak, uploads `docs/samples/`, waits for ingestion, asks five questions —
+four answerable from the corpus and one deliberately not — then checks tenant isolation and
+admin RBAC and prints the console stats. Pass your own files as arguments to use them instead.
+
+The fifth question matters: an answer to it means grounding has broken, because nothing in the
+corpus mentions it. Watch for `grounded=False` there and `grounded=True` on the rest.
 
 ## License
 

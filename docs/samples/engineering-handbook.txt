@@ -1,0 +1,19 @@
+Acme Corp Engineering Handbook
+
+Deployment windows. Production deploys are allowed Monday through Thursday between 10:00 and
+16:00 IST. Friday deploys are forbidden except for Sev-1 incident fixes, which need sign-off
+from the on-call lead. Deploys during a code freeze need VP Engineering approval.
+
+On-call rotation. Each rotation lasts seven days and starts on Wednesday at 11:00 IST. The
+secondary on-call is the person who held primary the previous week. Handover notes are
+mandatory and go in the rotation channel before 11:00.
+
+Incident severity. Sev-1 means customer-facing outage or data loss. Sev-2 means degraded
+service with a workaround. Sev-3 is everything else. Sev-1 and Sev-2 require a written
+postmortem within five working days.
+
+Code review. Every change needs one approval, and two for anything touching authentication,
+billing, or the migration directory. Approvals expire if the branch is force-pushed.
+
+Laptop refresh. Engineering laptops are refreshed every three years. A replacement before that
+needs a written justification to the engineering manager.
