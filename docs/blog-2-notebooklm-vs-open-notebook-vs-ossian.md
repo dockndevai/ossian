@@ -24,9 +24,10 @@ NotebookLM.
 |---|---|
 | **Gemini Notebook** | a person, reading sources, who wants excellent answers with zero setup |
 | **Open Notebook** | a person who wants that, privately, on their own machine, with any model |
-| **Ossian** | a company that needs a documented corpus other software can query |
+| **Ossian** | a company putting RAG behind its agents, with the ingestion pipeline and controls that needs |
 
-The first two are notebooks. The third is infrastructure that happens to have a notebook on top.
+The first two are notebooks. The third is a RAG backend for agents — ingestion pipeline,
+retrieval, memory, credentials, limits and audit — that happens to have a notebook on top.
 
 ---
 
@@ -85,9 +86,11 @@ for.
 
 Mine. Apache-2.0, Spring Boot and Spring AI, Postgres with pgvector, Redis, Keycloak, React.
 
-**What it is built for: being queried by other software, inside a company, and operated by someone
-who is on call for it.** The notebook UI exists so a person can use the corpus, but it is not the
-point. The point is everything around it:
+**What it is built for: putting RAG behind a company's agents, with everything needed to run that
+in production.** The notebook UI exists so a person can use the corpus, but it is not the point.
+The point is the stack around it — an ingestion pipeline you can operate, retrieval you can debug,
+memory the agents own, and the integration surface a company needs to put this behind its own
+software:
 
 - **Keycloak OAuth 2.0** with roles, and **API keys** so an agent can authenticate without a
   browser — a key carries its own roles and can be confined to a single namespace
@@ -112,23 +115,24 @@ you — Postgres, Redis, Keycloak and a model gateway is a real deployment, not 
 
 ## Side by side
 
-| | Gemini Notebook | Open Notebook | Ossian |
+| | Gemini | Open Notebook | Ossian |
 |---|---|---|---|
 | Licence | proprietary | MIT | Apache-2.0 |
-| Runs on | Google's servers | yours | yours |
-| Setup | none | `docker compose up` | compose + Keycloak + a gateway |
-| Source limits | 50–600 per notebook by plan | your disk | your disk |
-| Models | Gemini | 18+ providers, or fully local | whatever the gateway routes to |
-| Auth | Google account | optional password | OAuth 2.0 + roles + API keys |
-| API | none | full REST | full REST + OpenAPI |
-| Audio overview | yes | yes, 1–4 speakers | no |
+| Runs on | Google | yours | yours |
+| Setup | none | compose | compose + Keycloak |
+| Source cap | 50–600 by plan | your disk | your disk |
+| Models | Gemini | 18+, or local | via the gateway |
+| Auth | Google account | password | OAuth2 + roles + keys |
+| API | none | REST | REST + OpenAPI |
+| Ingestion | upload | upload | upload, URL, events |
+| Audio overview | yes | yes, 1–4 voices | no |
 | Transformations | — | yes | yes |
-| Vector inspection | no | no | yes |
-| Rate limiting | by plan quota | no | per-credential, requests and tokens |
+| Vector inspector | no | no | yes |
+| Rate limits | plan quota | no | per credential |
 | Audit trail | no | no | yes |
 | Agent memory | no | no | yes |
-| Ingestion metrics | no | no | Prometheus + console |
-| Maturity | shipped, huge | mature, active | new |
+| Metrics | no | no | Prometheus |
+| Maturity | shipped | mature | new |
 
 Read that table carefully in both directions. The bottom half is why you would choose Ossian; the
 top half is why you probably should not.
