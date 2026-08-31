@@ -255,9 +255,16 @@ An unknown namespace resolves to the default rather than erroring. The alternati
 silently returning an empty corpus — reads as "my documents are gone" and sends people looking
 in the wrong place.
 
-Not every page is namespace-scoped, and the UI says which. Pages the switcher filters carry a
-dot in the navigation; on the others the switcher greys itself out and says so. A global control
-that silently does nothing on half the app is worse than no control at all.
+Not every page is namespace-scoped, and the UI says which. The picker sits **inside the Work
+section** rather than above the navigation: it governs three pages and not the rest, and a
+control at the top of a sidebar reads as applying to everything under it. Pages it does affect
+carry a dot; on the others it disables itself and says so once — nothing is said in the common
+case, because an explanation shown permanently stops being read.
+
+Each option carries a document count (`default · 4`, `runbooks · 0`), since the question people
+bring to a namespace picker is which one their documents are in. When looking across all
+namespaces every source is labelled with its own, which is the only thing distinguishing two
+files that share a name.
 
 | Page | Scoped | Why |
 |---|---|---|

@@ -232,21 +232,37 @@ export default function NotebookPage() {
                   {d.filename}
                 </span>
               </label>
+              {/* Facts on one line, actions on the next. Together they wrapped mid-chip and
+                  clipped the last control, which is the state this rail is easiest to get into
+                  because a filename can be any length. */}
               <div className="source-meta">
                 <span className={`chip ${statusClass(d.status)}`}>{d.status.toLowerCase()}</span>
-                {d.status === "READY" && <span className="chip">{d.chunkCount} chunks</span>}
+                {/* Only when looking at everything. Filtered to one namespace the label is on
+                    every row and says nothing; unfiltered, two files of the same name in
+                    different namespaces are otherwise indistinguishable. */}
+                {!namespace && d.namespace && (
+                  <span className="chip ns-chip" title={`In the ${d.namespace} namespace`}>
+                    {d.namespace}
+                  </span>
+                )}
+                {d.status === "READY" && (
+                  <span className="chip">
+                    {d.chunkCount} {d.chunkCount === 1 ? "chunk" : "chunks"}
+                  </span>
+                )}
                 {d.sourceUrl && (
                   <a className="chip" href={d.sourceUrl} target="_blank" rel="noreferrer" title={d.sourceUrl}>
                     link
                   </a>
                 )}
-                <span className="spacer" />
+              </div>
+              <div className="source-actions">
                 <button
                   className="link"
                   title="Run transformations over this whole source"
                   onClick={() => setStudioFor(studioFor === d.id ? null : d.id)}
                 >
-                  {studioFor === d.id ? "hide" : "studio"}
+                  {studioFor === d.id ? "hide studio" : "studio"}
                 </button>
                 <button className="link" title="Remove source" onClick={() => void remove(d.id)}>
                   remove

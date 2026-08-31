@@ -37,6 +37,7 @@ async function request<T>(token: string | undefined, path: string, init: Request
 export interface DocumentView {
   id: string;
   filename: string;
+  namespace?: string | null;
   /** Present when the source was fetched from a URL rather than uploaded. */
   sourceUrl?: string | null;
   title: string | null;
@@ -167,6 +168,8 @@ export async function askStream(
 export interface NamespaceView {
   name: string;
   description: string | null;
+  documents: number;
+  chunks: number;
   createdAt: string;
 }
 

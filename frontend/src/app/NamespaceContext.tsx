@@ -7,8 +7,9 @@ import { api, type NamespaceView } from "../api/client";
  *
  * It is app state rather than a prop because the choice outlives the page: picking a namespace
  * in the notebook and then opening the vector view should not silently reset it to everything.
- * The selection is remembered per browser —
- * is not the UI's to choose.
+ * The selection is remembered per browser, in session storage rather than local — a namespace is
+ * a working context, and coming back tomorrow to a filter set last week is a corpus that appears
+ * to have shrunk.
  */
 
 interface NamespaceState {

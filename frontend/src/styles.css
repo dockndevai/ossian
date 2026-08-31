@@ -83,9 +83,9 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 /* ---------- notebook: sources | thread | cited passage ---------- */
 /* The notebook owns the viewport below the header so the thread scrolls on its own rather than
    dragging the page, which is what makes a long conversation usable. */
-.notebook { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 0;
+.notebook { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0;
   height: 100vh; }
-.notebook:has(.citation-pane) { grid-template-columns: 300px minmax(0, 1fr) 340px; }
+.notebook:has(.citation-pane) { grid-template-columns: 320px minmax(0, 1fr) 340px; }
 
 .sources { border-right: 1px solid var(--line); background: var(--panel); padding: 16px;
   overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
@@ -100,8 +100,16 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 .source-list li { border: 1px solid var(--line); border-radius: 9px; padding: 10px; background: var(--bg); }
 .source-list li.picked { border-color: var(--accent); }
 .source-list label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
-.source-name { word-break: break-word; font-weight: 550; }
-.source-meta { display: flex; gap: 6px; align-items: center; margin-top: 7px; }
+/* Truncate rather than wrap: a long filename otherwise pushes the whole card taller and
+   the list stops being scannable. The full name is in the title attribute. */
+.source-name { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; }
+.source-list label { min-width: 0; }
+.source-meta { display: flex; gap: 5px; align-items: center; margin-top: 7px;
+  flex-wrap: wrap; }
+.source-meta .chip { white-space: nowrap; max-width: 110px; overflow: hidden;
+  text-overflow: ellipsis; }
+.source-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
 button.link { border: none; background: none; padding: 0; color: var(--muted);
   font-size: 12px; text-decoration: underline; }
 button.link:hover { color: var(--accent); }
@@ -174,12 +182,6 @@ tr.clickable:hover { background: var(--bg); }
   display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh;
   overflow-y: auto; }
 .brand { font-weight: 700; font-size: 17px; padding: 0 8px; }
-.ns { display: flex; flex-direction: column; gap: 6px; padding: 10px 8px; background: var(--bg);
-  border: 1px solid var(--line); border-radius: 9px; }
-.ns select { width: 100%; }
-.ns-new { display: flex; flex-wrap: wrap; gap: 6px; }
-.ns-new input { flex: 1; min-width: 100px; }
-.ns-new button { padding: 5px 9px; font-size: 12px; }
 .nav nav { display: flex; flex-direction: column; gap: 16px; flex: 1; }
 .nav-section h4 { margin: 0 0 6px; padding: 0 8px; font-size: 11px; text-transform: uppercase;
   letter-spacing: .07em; color: var(--muted); }
@@ -257,8 +259,6 @@ tr.clickable:hover { background: var(--bg); }
 .scoped-dot { position: absolute; right: 8px; top: 10px; width: 6px; height: 6px;
   border-radius: 50%; background: var(--accent); opacity: .85; }
 .nav a.active .scoped-dot { background: #fff; }
-.ns.inactive { opacity: .5; }
-.ns-note { font-size: 11px; line-height: 1.4; }
 .scope-banner { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
   border: 1px solid var(--line); border-radius: 9px; background: var(--panel);
   margin-bottom: 14px; font-size: 12px; color: var(--muted); }
@@ -321,3 +321,24 @@ a.chip { text-decoration: none; }
   border: none; border-radius: 0; background: var(--bg); padding: 8px 10px; }
 .insight-body { padding: 4px 10px 10px; }
 .insight-body .passage { white-space: pre-wrap; font-size: 13px; }
+
+/* ---------- namespace picker (inside Work) ---------- */
+/* Sized to the nav's own rhythm rather than framed as a panel: it is one of the controls in
+   this section, not a header sitting above the whole app. */
+.picker { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+.picker-row { display: flex; gap: 6px; }
+.picker-row select { flex: 1; min-width: 0; padding: 6px 8px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink);
+  font-family: inherit; }
+.picker-add { width: 30px; flex: none; padding: 0; font-size: 15px; line-height: 1;
+  border-radius: 8px; }
+.picker-new { display: flex; gap: 6px; }
+.picker-new input { flex: 1; min-width: 0; padding: 6px 8px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink);
+  font: inherit; font-size: 13px; }
+.picker-new button { padding: 6px 10px; font-size: 12px; }
+.picker-note { font-size: 11px; line-height: 1.35; margin: 0; }
+/* Dimmed rather than hidden: a control that vanishes between pages is harder to find again
+   than one that is visibly unavailable. */
+.picker.inert select, .picker.inert .picker-add { opacity: .45; cursor: not-allowed; }
+.ns-chip { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); }
