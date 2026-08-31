@@ -1,3 +1,5 @@
+name: ossian
+
 # Local infrastructure for Ossian.
 #
 #   docker compose up -d
