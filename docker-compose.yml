@@ -58,8 +58,39 @@ services:
       retries: 30
       start_period: 30s
 
-  # Models. Openbook talks to spring-llm-gateway by default, which in turn talks to this.
-  # Point LLM_BASE_URL straight here to cut the gateway out.
+  # The LLM gateway. Openbook speaks the OpenAI protocol to this, and it owns routing,
+  # virtual keys, per-tenant token quotas, usage metering and failover -- so Openbook holds
+  # no upstream model credentials of its own.
+  #
+  # Build the image once from https://github.com/dockndevai/spring-llm-gateway:
+  #     docker build -t spring-llm-gateway:0.1.0 .
+  # Or set LLM_BASE_URL=http://ollama:11434 on the backend to cut it out entirely.
+  llm-gateway:
+    image: spring-llm-gateway:0.1.0
+    container_name: openbook-llm-gateway
+    depends_on:
+      ollama:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      # Inside the compose network the backends are service names, not localhost.
+      LLM_OLLAMA_URI: http://ollama:11434
+      LLM_VLLM_URI: http://vllm-not-present:8000
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # Small budget by default so a runaway ingestion is capped rather than unbounded.
+      LLM_GATEWAY_AUTH_KEYS_DEMO_TOKENS_PER_MINUTE: "500000"
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+
+  # Models behind the gateway.
   ollama:
     image: ollama/ollama:latest
     container_name: openbook-ollama

@@ -41,6 +41,15 @@ per-tenant token quotas and metering. Point `LLM_BASE_URL` straight at Ollama to
 
 ## Quick start
 
+The gateway ships as a container image. Build it once from the
+[spring-llm-gateway](https://github.com/dockndevai/spring-llm-gateway) checkout:
+
+```bash
+docker build -t spring-llm-gateway:0.1.0 .
+```
+
+Then bring the whole stack up:
+
 ```bash
 docker compose up -d
 ```
@@ -77,7 +86,15 @@ Open <http://localhost:5173> and sign in. The realm is imported automatically:
 tenancy comes from the token.
 
 Ports avoid the usual defaults so this runs beside other local services: backend **8081**,
-Postgres **5433**, Keycloak **8180**, Redis **6380**, Ollama **11435**.
+Postgres **5433**, Keycloak **8180**, Redis **6380**, LLM gateway **8090**, Ollama **11435**.
+
+Inside the compose network services address each other by name — the backend reaches the
+gateway at `http://llm-gateway:8080`, and the gateway reaches Ollama at `http://ollama:11434`.
+A container's `localhost` is its own, which is the usual reason a working local config breaks
+the moment it is containerised.
+
+Don't want the gateway? Set `LLM_BASE_URL=http://ollama:11434` on the backend and it talks to
+Ollama directly — you lose virtual keys, quotas and metering, nothing else.
 
 ---
 
