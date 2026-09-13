@@ -231,7 +231,7 @@ class MemoryTests {
 	void recencyRanks() {
 		write("support", null, null, "alpha remembered long ago", null, null);
 		// Age it by 90 days — three half-lives, so roughly an eighth of its original weight.
-		this.jdbc.update("update agent_memories set created_at = now() - interval '90 days'");
+		age("alpha remembered long ago", 90);
 		write("support", null, null, "alpha remembered just now", null, null);
 
 		List<MemoryService.Memory> found = this.memories.recall("alpha", "support", null, null, 5, 0.5);
@@ -239,6 +239,48 @@ class MemoryTests {
 		assertThat(found).hasSize(2);
 		assertThat(found.get(0).content()).contains("just now");
 		assertThat(found.get(1).score()).isLessThan(found.get(0).score() / 4);
+	}
+
+	@Test
+	@DisplayName("restating an old memory makes it recent again")
+	void restatingRefreshesAge() {
+		write("support", null, null, "alpha still true after all this time", null, null);
+		write("support", null, null, "alpha said last week", null, null);
+		age("alpha still true after all this time", 90);
+		age("alpha said last week", 7);
+
+		// Saying it again is fresh evidence it holds, so it should outrank the week-old one.
+		write("support", null, null, "alpha still true after all this time", null, null);
+
+		List<MemoryService.Memory> found = this.memories.recall("alpha", "support", null, null, 5, 0.5);
+		assertThat(found.get(0).content()).contains("still true");
+		assertThat(found.get(0).score()).isGreaterThan(0.99);
+	}
+
+	@Test
+	@DisplayName("recalling a stale memory does not let it outrank the newer one contradicting it")
+	void readingDoesNotRefreshAge() {
+		write("support", null, "user:ankit", "alpha ankit prefers the dark theme", null, null);
+		age("alpha ankit prefers the dark theme", 90);
+		write("support", null, "user:ankit", "alpha ankit switched to the light theme", null, null);
+
+		// Both match every recall, so both are marked used every time. If use refreshed age the
+		// two would tie on recency and the stale preference could come back first.
+		for (int i = 0; i < 3; i++) {
+			List<MemoryService.Memory> found = this.memories.recall("alpha", "support", null, "user:ankit", 5, 0.5);
+			this.memories.markUsed(found.stream().map(MemoryService.Memory::id).toList());
+		}
+
+		List<MemoryService.Memory> found = this.memories.recall("alpha", "support", null, "user:ankit", 5, 0.5);
+		assertThat(found).hasSize(2);
+		assertThat(found.get(0).content()).contains("light theme");
+		assertThat(found.get(1).score()).isLessThan(found.get(0).score() / 4);
+	}
+
+	/** Backdates a memory as though it were written, and last restated, this many days ago. */
+	private void age(String content, int days) {
+		this.jdbc.update("update agent_memories set created_at = now() - make_interval(days => ?), "
+				+ "updated_at = now() - make_interval(days => ?) where content = ?", days, days, content);
 	}
 
 	@Test
@@ -287,7 +329,7 @@ class MemoryTests {
 	}
 
 	@Test
-	@DisplayName("use is recorded, which is what keeps a live memory from decaying away")
+	@DisplayName("use is recorded for the console")
 	void useIsCounted() {
 		write("support", null, null, "alpha frequently needed", null, null);
 		List<MemoryService.Memory> found = this.memories.recall("alpha", "support", null, null, 5, 0.5);
