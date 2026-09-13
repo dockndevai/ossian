@@ -171,7 +171,9 @@ public class EventIngestController {
 			IngestEvent.Operation op = IngestEvent.Operation.valueOf(request.operation().trim().toUpperCase());
 			event.setOperation(op);
 			UUID documentId = (op == IngestEvent.Operation.DELETE) ? delete(event) : upsert(event, request);
-			event.setDocumentId(documentId);
+			// A delete reports the id it removed, but cannot record it: the document row is already
+			// gone, and a foreign key to it fails the insert. The external id still says what it was.
+			event.setDocumentId((op == IngestEvent.Operation.DELETE) ? null : documentId);
 			event.setStatus(IngestEvent.Status.ACCEPTED);
 			this.events.save(event);
 			return new EventResult(request.eventId(), event.getStatus().name(), documentId, null);
