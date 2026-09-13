@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1500px; height:750px; background:#f7f7f8; overflow:hidden;
+         font-family:Inter,-apple-system,system-ui,sans-serif; color:#18181b; }
+  .wrap { padding:76px 88px 0; height:100%; display:flex; flex-direction:column; }
+  h1 { font-size:53px; line-height:1.06; letter-spacing:-.034em; font-weight:700; white-space:nowrap; }
+  .sub { margin-top:18px; font-size:25px; color:#71717a; }
+  .sub em { font-style:normal; color:#18181b; font-weight:600; }
+  /* Three bugs, each shown as what it looked like from outside: nothing in any of them is red,
+     because none of them ever looked like a failure. That is the post. */
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; margin-top:52px;
+          min-height:310px; }
+  .card { background:#fff; border:1px solid #e4e4e7; border-radius:14px; padding:26px 26px 24px;
+        display:flex; flex-direction:column; }
+  .n { font-size:14px; font-family:'JetBrains Mono',monospace; color:#a1a1aa; }
+  .name { margin-top:6px; font-size:25px; font-weight:700; letter-spacing:-.015em; }
+  .code { margin-top:18px; font-family:'JetBrains Mono',monospace; font-size:15px; line-height:1.7;
+          background:#f7f7f8; border:1px solid #eeeef0; border-radius:9px; padding:12px 14px; color:#3f3f46; }
+  .code b { color:#4f46e5; font-weight:500; }
+  .code i { font-style:normal; color:#a1a1aa; }
+  .line { margin-top:auto; padding-top:16px; font-size:16.5px; line-height:1.45; color:#52525b; }
+  .foot { margin-top:auto; padding:22px 0 50px; display:flex; align-items:center; gap:12px;
+          color:#a1a1aa; font-size:15px; font-family:'JetBrains Mono',monospace; }
+  .foot .dot { width:5px; height:5px; border-radius:50%; background:#d4d4d8; }
+  .foot .ok { color:#15803d; }
+</style>
+<div class="wrap">
+  <h1>A question found two bugs. The fix found a third.</h1>
+  <div class="sub">Every test passed. <em>The tests had the same blind spots as the code.</em></div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="n">01 · retrieval</div>
+      <div class="name">One source, cited three times</div>
+      <div class="code"><b>[1]</b> handbook<br><b>[2]</b> handbook<br><b>[3]</b> handbook</div>
+      <div class="line">Chunks were numbered, not documents — so it read as agreement.</div>
+    </div>
+    <div class="card">
+      <div class="n">02 · memory</div>
+      <div class="name">Aged from the wrong moment</div>
+      <div class="code">0.5^(now − <b>created_at</b>)<br><i>restated daily · still decayed</i></div>
+      <div class="line">Now ages from when it was last said. Not read: that would tie old and new.</div>
+    </div>
+    <div class="card">
+      <div class="n">03 · ingestion</div>
+      <div class="name">A 500 that happened once</div>
+      <div class="code">DELETE → <b>500</b><br>retry&nbsp;&nbsp;→ 200 <i>· nothing left</i></div>
+      <div class="line">A foreign key to the row it had just deleted. Every retrying pipeline hid it.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="ok">✓ all tests passing</span>
+    <span class="dot"></span>
+    <span>Ossian · self-hosted RAG · Debezium → Kafka Connect sink</span>
+  </div>
+</div>
