@@ -81,11 +81,28 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 .card .value { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
 
 /* ---------- notebook: sources | thread | cited passage ---------- */
-/* The notebook owns the viewport below the header so the thread scrolls on its own rather than
-   dragging the page, which is what makes a long conversation usable. */
-.notebook { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0;
-  height: 100vh; }
-.notebook:has(.citation-pane) { grid-template-columns: 320px minmax(0, 1fr) 340px; }
+/* The notebook owns the viewport beside the navigation so the thread scrolls on its own rather
+   than dragging the page, which is what makes a long conversation usable.
+
+   Its size must come from the viewport and never from what is inside it. The row is capped at
+   the notebook's height (minmax(0, 1fr), not auto) so a long thread scrolls inside its pane
+   instead of stretching the grid, and the rail widths are proportions of the content column
+   (cqi) rather than fixed pixels, so the thread keeps a readable width as the window narrows. */
+.notebook { display: grid; grid-template-columns: clamp(240px, 26cqi, 320px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr); gap: 0; height: 100vh; height: 100dvh; position: relative; }
+.notebook > * { min-height: 0; }
+
+/* The side pane (a cited passage, or the studio) only takes a column when the thread would keep
+   a comfortable width beside it. Below that it slides over the thread: squeezing three columns
+   into a laptop screen left the conversation a couple of hundred pixels wide, and made every
+   open and close of a citation reflow the answer being read. */
+.citation-pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(380px, 100%);
+  z-index: 5; box-shadow: var(--shadow); }
+@container content (min-width: 1100px) {
+  .notebook:has(.citation-pane) {
+    grid-template-columns: clamp(240px, 24cqi, 320px) minmax(0, 1fr) 340px; }
+  .citation-pane { position: static; width: auto; box-shadow: none; }
+}
 
 .sources { border-right: 1px solid var(--line); background: var(--panel); padding: 16px;
   overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
@@ -121,6 +138,9 @@ button.link:hover { color: var(--accent); }
 .turn .q { font-weight: 600; font-size: 15px; margin: 0 0 10px; }
 .turn .a { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   padding: 14px 16px; white-space: pre-wrap; }
+/* A URL, hash or identifier has no break opportunity, and one in an answer would otherwise
+   widen the thread past its column. */
+.turn .q, .turn .a, .passage { overflow-wrap: anywhere; }
 .caret { display: inline-block; width: 7px; height: 15px; background: var(--accent);
   vertical-align: -2px; animation: blink 1s step-end infinite; }
 @keyframes blink { 50% { opacity: 0; } }
@@ -171,9 +191,17 @@ tr.clickable:hover { background: var(--bg); }
 .card .value.bad { color: var(--bad); }
 .card .value.warn { color: var(--warn); }
 
-@media (max-width: 900px) {
-  .notebook, .notebook:has(.citation-pane) { grid-template-columns: 1fr; height: auto; }
-  .sources, .citation-pane { border: none; border-bottom: 1px solid var(--line); }
+/* Narrow: one column. Sources become a capped, scrollable strip above the conversation, and a
+   cited passage opens as a sheet from the bottom rather than pushing the thread off screen. */
+@container content (max-width: 719px) {
+  .notebook, .notebook:has(.citation-pane) { grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr); }
+  .sources { max-height: 34dvh; border-right: none; border-bottom: 1px solid var(--line); }
+  .thread { padding: 16px; }
+  .composer { padding: 12px 16px 16px; }
+  .citation-pane { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto;
+    max-height: 65dvh; border-left: none; border-top: 1px solid var(--line);
+    border-radius: 14px 14px 0 0; }
 }
 
 /* ---------- shell: left navigation ---------- */
@@ -192,10 +220,16 @@ tr.clickable:hover { background: var(--bg); }
 .nav a.active .muted { color: rgb(255 255 255 / .8); }
 .account { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 8px;
   border-top: 1px solid var(--line); }
-.content { min-width: 0; }
+/* The content column is a <main>, so it has to undo the generic main rule above. Left in place,
+   its auto margins made it shrink to fit whatever the page rendered — the notebook got narrower
+   and re-centred every time the conversation changed — and its padding pushed a 100dvh notebook
+   past the bottom of the window. It is also the size container the notebook's layout queries. */
+.content { min-width: 0; max-width: none; margin: 0; padding: 0;
+  container-type: inline-size; container-name: content; }
 /* Every page except the notebook gets the usual page padding; the notebook manages its own
    full-height layout. */
-.content > .stack { padding: 20px; max-width: 1100px; margin: 0 auto; }
+.content > .stack { padding: 40px; max-width: 1140px; margin: 0 auto; }
+@media (max-width: 700px) { .content > .stack { padding: 20px; } }
 
 /* ---------- settings ---------- */
 .settings { display: flex; flex-direction: column; gap: 22px; margin-top: 8px; }
@@ -362,3 +396,43 @@ a.chip { text-decoration: none; }
 .card .value.bad { color: var(--bad); }
 .rail-head select { padding: 5px 8px; font-size: 12px; border: 1px solid var(--line);
   border-radius: 7px; background: var(--bg); color: var(--ink); font-family: inherit; }
+
+/* ---------- shell below 1000px: a compact top bar ---------- */
+/* Last in the file on purpose: these override base rules declared above, and a media query does
+   not raise specificity, so earlier placement would lose to them.
+
+   Stacked as-is, the sidebar put every section heading, hint, the theme picker and the account
+   above the page — around 830px on a phone before the notebook began. The bar keeps every link
+   and control, drops the hints, and scrolls sideways rather than wrapping into a second sidebar.
+   The shell then owns the viewport and the content column scrolls, so a full-height page such as
+   the notebook fits under the bar instead of overflowing it by the bar's height. */
+@media (max-width: 1000px) {
+  /* minmax(0, 1fr), not 1fr: a plain 1fr track will not shrink below its content, so the link row
+     widened the whole page past the screen instead of scrolling inside the bar. */
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
+    height: 100vh; height: 100dvh; min-height: 0; }
+  .nav, .nav nav { min-width: 0; }
+  .content { overflow-y: auto; }
+  .notebook { height: 100%; }
+
+  .nav { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+    padding: 8px 12px; overflow: visible; }
+  .brand { padding: 0; }
+  .nav nav { order: 3; flex: 1 1 100%; flex-direction: row; align-items: center; gap: 4px;
+    overflow-x: auto; scrollbar-width: none; }
+  .nav-section { display: contents; }
+  .nav-section h4, .nav a .small, .picker-note { display: none; }
+  .nav a { flex-direction: row; flex: none; white-space: nowrap; padding: 6px 12px; position: relative; }
+  .scoped-dot { right: 4px; top: 5px; }
+  .picker { flex: none; padding: 0 6px 0 0; }
+  .picker-row select { max-width: 190px; }
+
+  .theme { order: 1; flex-direction: row; align-items: center; gap: 8px; padding: 0; border: none;
+    margin-left: auto; }
+  .theme > .small { display: none; }
+  .seg button { padding: 4px 8px; }
+  .account { order: 2; padding: 0; border-top: none; }
+}
+@media (max-width: 520px) {
+  .swatches { display: none; }
+}
