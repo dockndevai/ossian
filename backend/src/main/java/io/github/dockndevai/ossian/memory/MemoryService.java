@@ -34,6 +34,12 @@ import org.springframework.transaction.annotation.Transactional;
  * every turn would bury itself. Identical content within one scope updates the existing row and
  * refreshes it rather than adding another.
  *
+ * <p><b>Age runs from the last time something was said, not the last time it was read.</b> A
+ * restatement is fresh evidence that a fact still holds, so it restarts the half-life. Being
+ * recalled is not: recall returns whatever matches, so an old preference and the newer one that
+ * contradicts it are recalled together, and refreshing both on read would erase the recency that
+ * lets the newer one win.
+ *
  * <p><b>Some of it should be forgotten.</b> Session memory is scratch. Expiry is enforced on read
  * as well as by cleanup, so an expired memory is never returned even in the window before it is
  * deleted — a memory that outlives its stated lifetime is worse than one that was never kept.
@@ -124,7 +130,7 @@ public class MemoryService {
 				       created_at, last_used_at, use_count, expires_at,
 				       (1 - (embedding <=> ?::vector))
 				         * importance
-				         * power(0.5, extract(epoch from (now() - created_at)) / ?) as score
+				         * power(0.5, extract(epoch from (now() - updated_at)) / ?) as score
 				from agent_memories
 				where agent_id = ?
 				  and (?::text is null or session_id = ?)
@@ -186,7 +192,12 @@ public class MemoryService {
 		return found.stream().findFirst();
 	}
 
-	/** Records that these memories were used, which is what keeps a live one from decaying away. */
+	/**
+	 * Records that these memories were used, for the operator's view of what an agent relies on.
+	 *
+	 * <p>Deliberately does not touch the ranking: see the class comment on why reading a memory
+	 * must not make it look recent.
+	 */
 	@Transactional
 	public void markUsed(List<UUID> ids) {
 		if (ids == null || ids.isEmpty()) {

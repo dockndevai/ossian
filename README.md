@@ -215,6 +215,13 @@ documents" without calling the model at all. An open-book system that invents an
 than one that admits the gap — and those refusals are recorded, which is what powers the
 coverage-gaps screen.
 
+### One document is one citation, however many chunks it contributes
+
+Retrieval returns chunks, and three chunks of one handbook numbered `[1]`, `[2]`, `[3]` read as three
+sources agreeing — to the model and to whoever checks the answer. They are grouped by document
+before the prompt is built: every passage is kept, under one number, ranked by the document's best
+chunk. Two files that merely share a filename stay separate.
+
 ### Chunk metadata is what makes deletion possible
 
 The vector store has no foreign keys. Every chunk carries `document_id` and `namespace` metadata,
@@ -344,6 +351,11 @@ Three things make it memory rather than a second corpus:
 ago is as true as one from today. For memory the opposite holds, so ranking is
 `similarity × importance × 0.5^(age / 30 days)`. A half-life rather than a cliff: durable facts
 survive, a stale preference loses to a fresh one.
+
+Age runs from the last time a memory was **said**, not the last time it was **read**. Restating
+something restarts its half-life, because that is fresh evidence it still holds. Recalling it does
+not: an old preference and the newer one contradicting it match the same recall, and refreshing
+both on read would tie them on recency — the one thing that lets the newer one win.
 
 **Restatement is not new information.** An agent writing what it already knows on every turn
 would bury itself, so identical content in the same scope updates the existing row.

@@ -82,8 +82,8 @@ public class MemoryController {
 
 		List<MemoryService.Memory> found = this.memories.recall(request.query(), request.agentId(),
 				request.sessionId(), request.subject(), topK, floor);
-		// Use is recorded so a memory that keeps proving useful stops decaying like one nobody
-		// has needed since it was written.
+		// Use is recorded for the console. It does not refresh a memory's age: a stale fact is
+		// recalled alongside the newer one contradicting it, and refreshing both would tie them.
 		this.memories.markUsed(found.stream().map(MemoryService.Memory::id).toList());
 		return found;
 	}

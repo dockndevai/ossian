@@ -384,8 +384,8 @@ export default function NotebookPage() {
           </div>
           <p className="passage">{openCitation.excerpt}</p>
           <p className="muted small">
-            This is the passage the retriever handed the model — the exact text the answer was
-            written from.
+            The passages the retriever handed the model from this source — the exact text the
+            answer was written from. Several passages of one document share one citation.
           </p>
         </aside>
       )}
