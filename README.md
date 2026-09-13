@@ -666,6 +666,18 @@ Three properties follow from that, and they are the design:
 outlives the token it started with — a client that captured one at construction works in testing
 and starts failing minutes after deployment.
 
+### From Kafka, via Debezium
+
+A database already feeding Kafka does not need an importer written for it. The sink connector
+lives in its own repository — [dockndevai/ossian-kafka-connect](https://github.com/dockndevai/ossian-kafka-connect)
+— and turns Debezium change events into these event calls: inserts and updates become `UPSERT`,
+deletes become `DELETE`, and the row's primary key becomes the `externalId`.
+
+The event id is built from the record's position in Kafka (topic, partition, offset), so a connector that restarts and
+re-reads a topic produces duplicates this endpoint already ignores rather than second copies.
+Issue it an API key confined to the namespace it feeds. The repository carries a runnable
+Postgres → Debezium → Kafka → Ossian example.
+
 ---
 
 ## Configuration
