@@ -222,6 +222,16 @@ sources agreeing — to the model and to whoever checks the answer. They are gro
 before the prompt is built: every passage is kept, under one number, ranked by the document's best
 chunk. Two files that merely share a filename stay separate.
 
+### A long document does not crowd out a short one — unless it holds the answer
+
+Retrieval ranks passages, so a document split into forty chunks has forty chances to fill the
+top-k and one split into three has three. Grouping citations per document fixes how sources are
+numbered, not which ones are chosen. So Ossian fetches wider than top-k and caps how many passages
+one document contributes — but only when relevance is spread. When the best document leads the next
+by `dominance-margin`, the answer is usually one long procedure, and a cap would cut it in half; it
+keeps every slot it earned. A flat spread is the multi-document case, and the cap applies. Either
+way the model gets a full top-k: passages held back by the cap refill slots nothing else claims.
+
 ### Chunk metadata is what makes deletion possible
 
 The vector store has no foreign keys. Every chunk carries `document_id` and `namespace` metadata,
@@ -689,6 +699,8 @@ Postgres → Debezium → Kafka → Ossian example.
 | `ossian.ingest.max-file-size` | `25 MB` | Upload limit |
 | `ossian.retrieval.top-k` | `6` | Chunks per question |
 | `ossian.retrieval.similarity-threshold` | `0.5` | Below this, refuse to answer |
+| `ossian.retrieval.max-passages-per-document` | `2` | Passages one document may contribute when relevance is spread; `0` disables |
+| `ossian.retrieval.dominance-margin` | `0.1` | Lead at which the best document keeps every slot it earned |
 | `ossian.retrieval.cache-seconds` | `300` | Retrieval cache TTL |
 | `ossian.chat.system-prompt` | see config | Instruction that enforces citation and refusal |
 | `LLM_BASE_URL` | `http://localhost:8090` | OpenAI-compatible endpoint |

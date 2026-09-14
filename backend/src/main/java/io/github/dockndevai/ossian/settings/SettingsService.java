@@ -62,6 +62,10 @@ public class SettingsService {
 
 	public static final String RETRIEVAL_THRESHOLD = "retrieval.similarityThreshold";
 
+	public static final String RETRIEVAL_MAX_PASSAGES_PER_DOCUMENT = "retrieval.maxPassagesPerDocument";
+
+	public static final String RETRIEVAL_DOMINANCE_MARGIN = "retrieval.dominanceMargin";
+
 	public static final String INGEST_CHUNK_SIZE = "ingest.chunkSize";
 
 	public static final String INGEST_CHUNK_OVERLAP = "ingest.chunkOverlap";
@@ -88,6 +92,12 @@ public class SettingsService {
 					Type.INT, 1.0, 50.0, false),
 			new Definition(RETRIEVAL_THRESHOLD, "retrieval", "Similarity threshold",
 					"Minimum similarity for a chunk to count. Raise it and the system refuses more often; lower it and it answers from weak matches.",
+					Type.DOUBLE, 0.0, 1.0, false),
+			new Definition(RETRIEVAL_MAX_PASSAGES_PER_DOCUMENT, "retrieval", "Passages per document",
+					"How many chunks one document may contribute when several documents are relevant. Without it a long document takes most of the slots and short ones never reach the model. 0 turns the cap off.",
+					Type.INT, 0.0, 50.0, false),
+			new Definition(RETRIEVAL_DOMINANCE_MARGIN, "retrieval", "Dominance margin",
+					"How far the best document must lead the next before the cap is lifted for it. A clear leader is usually one long document holding the whole answer, and capping it cuts the procedure in half.",
 					Type.DOUBLE, 0.0, 1.0, false),
 			new Definition(INGEST_CHUNK_SIZE, "ingestion", "Chunk size (characters)",
 					"How much text goes in one chunk. Large chunks retrieve imprecisely; small ones lose the context that makes a passage meaningful.",
@@ -126,6 +136,8 @@ public class SettingsService {
 			case CHAT_SYSTEM_PROMPT -> p.getChat().getSystemPrompt();
 			case RETRIEVAL_TOP_K -> String.valueOf(p.getRetrieval().getTopK());
 			case RETRIEVAL_THRESHOLD -> String.valueOf(p.getRetrieval().getSimilarityThreshold());
+			case RETRIEVAL_MAX_PASSAGES_PER_DOCUMENT -> String.valueOf(p.getRetrieval().getMaxPassagesPerDocument());
+			case RETRIEVAL_DOMINANCE_MARGIN -> String.valueOf(p.getRetrieval().getDominanceMargin());
 			case INGEST_CHUNK_SIZE -> String.valueOf(p.getIngest().getChunkSize());
 			case INGEST_CHUNK_OVERLAP -> String.valueOf(p.getIngest().getChunkOverlap());
 			default -> throw new IllegalArgumentException("Unknown setting: " + key);

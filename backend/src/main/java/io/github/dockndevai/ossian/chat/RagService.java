@@ -79,9 +79,13 @@ public class RagService {
 				append(filter, "%s in [%s]".formatted(IngestionService.META_DOCUMENT, ids));
 			}
 		}
+		int topK = this.settings.effectiveInt(SettingsService.RETRIEVAL_TOP_K);
+		int cap = this.settings.effectiveInt(SettingsService.RETRIEVAL_MAX_PASSAGES_PER_DOCUMENT);
 		SearchRequest.Builder request = SearchRequest.builder()
 			.query(question)
-			.topK(this.settings.effectiveInt(SettingsService.RETRIEVAL_TOP_K))
+			// Wider than top-k when a cap applies: the documents that fill the slots a capped one
+			// gives up have to be among the candidates, or the cap just returns fewer passages.
+			.topK((cap > 0) ? Math.min(topK * CANDIDATE_FACTOR, MAX_CANDIDATES) : topK)
 			.similarityThreshold(this.settings.effectiveDouble(SettingsService.RETRIEVAL_THRESHOLD));
 		// Only when there is something to filter on. An empty expression is not "match
 		// everything" to the parser — it is a parse error.
@@ -90,10 +94,82 @@ public class RagService {
 		}
 		long started = System.nanoTime();
 		List<Document> hits = this.vectorStore.similaritySearch(request.build());
-		List<Document> found = (hits == null) ? List.of() : hits;
+		List<Document> found = select((hits == null) ? List.of() : hits, topK, cap,
+				this.settings.effectiveDouble(SettingsService.RETRIEVAL_DOMINANCE_MARGIN));
 		this.metrics.retrieval(namespace, found.size(), !found.isEmpty(),
 				java.time.Duration.ofNanos(System.nanoTime() - started));
 		return found;
+	}
+
+	/** How many candidates to fetch per slot when a per-document cap may push some out. */
+	static final int CANDIDATE_FACTOR = 3;
+
+	/** Upper bound on candidates, however large top-k is set. */
+	static final int MAX_CANDIDATES = 100;
+
+	/**
+	 * Cuts the candidates to top-k, capping each document's passages unless one document clearly
+	 * holds the answer.
+	 *
+	 * <p>The cap is a diversity constraint, and diversity is only right when relevance is spread.
+	 * When scores are flat across several documents the question draws on several, and a long
+	 * document taking most of the slots hides the short one that also answers it. When one document
+	 * leads the next by a wide margin, the answer is usually a long procedure in that one document,
+	 * and capping it drops the half that mattered. So the shape of the candidates decides, per
+	 * query, rather than one constant for every question.
+	 */
+	static List<Document> select(List<Document> candidates, int topK, int cap, double dominanceMargin) {
+		List<Document> ranked = candidates.stream()
+			.sorted(java.util.Comparator.comparing(Document::getScore,
+					java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+			.toList();
+		if (cap <= 0 || isDominated(ranked, dominanceMargin)) {
+			return ranked.subList(0, Math.min(topK, ranked.size()));
+		}
+		java.util.Map<String, Integer> taken = new java.util.HashMap<>();
+		List<Document> out = new ArrayList<>(topK);
+		List<Document> held = new ArrayList<>();
+		for (Document d : ranked) {
+			if (out.size() == topK) {
+				break;
+			}
+			if (taken.merge(documentKey(d), 1, Integer::sum) <= cap) {
+				out.add(d);
+			}
+			else {
+				held.add(d);
+			}
+		}
+		// The cap makes room for other documents; it is not a reason to send the model less. When
+		// there are not enough other documents to fill the slots, the held-back passages do.
+		for (Document d : held) {
+			if (out.size() == topK) {
+				break;
+			}
+			out.add(d);
+		}
+		out.sort(java.util.Comparator.comparing(Document::getScore,
+				java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+		return out;
+	}
+
+	/** Whether the best document leads the runner-up by at least the margin. One document leads by default. */
+	private static boolean isDominated(List<Document> ranked, double margin) {
+		java.util.Map<String, Double> best = new java.util.LinkedHashMap<>();
+		for (Document d : ranked) {
+			best.putIfAbsent(documentKey(d), (d.getScore() == null) ? 0.0 : d.getScore());
+		}
+		if (best.size() < 2) {
+			return true;
+		}
+		java.util.Iterator<Double> scores = best.values().iterator();
+		return scores.next() - scores.next() >= margin;
+	}
+
+	/** The document a chunk belongs to; a chunk without one cannot share and stands alone. */
+	private static String documentKey(Document d) {
+		Object id = d.getMetadata().get(IngestionService.META_DOCUMENT);
+		return (id == null) ? "chunk:" + d.getId() : id.toString();
 	}
 
 	/** Retrieval across every namespace, for callers that do not care which one a fact is in. */
