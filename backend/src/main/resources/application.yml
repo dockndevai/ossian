@@ -80,6 +80,8 @@ ossian:
     top-k: 6
     similarity-threshold: 0.5
     cache-seconds: 300
+    max-passages-per-document: 2
+    dominance-margin: 0.1
   chat:
     model: ${LLM_CHAT_MODEL:qwen2.5:3b}
     temperature: 0.1

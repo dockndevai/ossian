@@ -211,6 +211,19 @@ public class OssianProperties {
 		/** Cache retrieval results for identical question + tenant for this many seconds. */
 		private long cacheSeconds = 300;
 
+		/**
+		 * Chunks one document may contribute when relevance is spread across documents. Ranking is
+		 * per passage, so a document split into forty chunks otherwise has forty chances to fill
+		 * the top-k and one split into three has three. 0 disables the cap.
+		 */
+		private int maxPassagesPerDocument = 2;
+
+		/**
+		 * Score lead, in similarity, at which the best document is treated as holding the answer
+		 * and keeps every slot it earned. Below it the candidates are a spread and the cap applies.
+		 */
+		private double dominanceMargin = 0.1;
+
 		public int getTopK() {
 			return this.topK;
 		}
@@ -229,6 +242,22 @@ public class OssianProperties {
 
 		public long getCacheSeconds() {
 			return this.cacheSeconds;
+		}
+
+		public int getMaxPassagesPerDocument() {
+			return this.maxPassagesPerDocument;
+		}
+
+		public void setMaxPassagesPerDocument(int maxPassagesPerDocument) {
+			this.maxPassagesPerDocument = maxPassagesPerDocument;
+		}
+
+		public double getDominanceMargin() {
+			return this.dominanceMargin;
+		}
+
+		public void setDominanceMargin(double dominanceMargin) {
+			this.dominanceMargin = dominanceMargin;
 		}
 
 		public void setCacheSeconds(long cacheSeconds) {
