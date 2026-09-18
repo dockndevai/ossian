@@ -155,6 +155,7 @@ public class AdminController {
 	@PostMapping("/documents/{id}/reindex")
 	public JobView reindex(@PathVariable UUID id) {
 		DocumentEntity doc = this.documents.findById(id)
+			.filter(d -> this.namespaces.canSee(d.getNamespace()))
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 		var content = this.contents.findById(id)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,

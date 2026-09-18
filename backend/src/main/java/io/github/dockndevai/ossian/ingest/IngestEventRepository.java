@@ -13,4 +13,6 @@ public interface IngestEventRepository extends JpaRepository<IngestEvent, UUID> 
 
 	Page<IngestEvent> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+	Page<IngestEvent> findByNamespaceOrderByCreatedAtDesc(String namespace, Pageable pageable);
+
 }
