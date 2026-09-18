@@ -73,7 +73,11 @@ public class RagService {
 		this.namespaces.effectiveFilter(namespace)
 			.ifPresent(ns -> append(filter, "%s == '%s'".formatted(IngestionService.META_NAMESPACE, ns)));
 		if (documentIds != null && !documentIds.isEmpty()) {
-			String ids = documentIds.stream().filter(Objects::nonNull).map(id -> "'" + id + "'")
+			// Parsed, not quoted: these are pasted into a filter expression, and a value carrying a
+			// quote would end the list and append clauses of its own — including one naming another
+			// namespace. Re-serialising a parsed UUID leaves nothing but hex and dashes.
+			String ids = documentIds.stream().filter(Objects::nonNull).map(RagService::documentId)
+				.map(id -> "'" + id + "'")
 				.reduce((a, b) -> a + "," + b).orElse("");
 			if (!ids.isBlank()) {
 				append(filter, "%s in [%s]".formatted(IngestionService.META_DOCUMENT, ids));
@@ -99,6 +103,16 @@ public class RagService {
 		this.metrics.retrieval(namespace, found.size(), !found.isEmpty(),
 				java.time.Duration.ofNanos(System.nanoTime() - started));
 		return found;
+	}
+
+	private static String documentId(String raw) {
+		try {
+			return java.util.UUID.fromString(raw.strip()).toString();
+		}
+		catch (IllegalArgumentException ex) {
+			throw new org.springframework.web.server.ResponseStatusException(
+					org.springframework.http.HttpStatus.BAD_REQUEST, "documentIds must be document UUIDs");
+		}
 	}
 
 	/** How many candidates to fetch per slot when a per-document cap may push some out. */

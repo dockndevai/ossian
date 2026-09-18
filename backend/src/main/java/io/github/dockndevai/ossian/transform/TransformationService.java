@@ -123,13 +123,16 @@ public class TransformationService {
 
 	private final CallerContext caller;
 
+	private final io.github.dockndevai.ossian.namespace.NamespaceService namespaces;
+
 	private final CacheManager caches;
 
 	private final PipelineMetrics metrics;
 
 	public TransformationService(TransformationRepository transformations, InsightRepository insights,
 			DocumentRepository documents, DocumentContentRepository contents, ChatClient.Builder chatClientBuilder,
-			SettingsService settings, OssianProperties properties, CallerContext caller, CacheManager caches, PipelineMetrics metrics) {
+			SettingsService settings, OssianProperties properties, CallerContext caller, CacheManager caches, PipelineMetrics metrics,
+			io.github.dockndevai.ossian.namespace.NamespaceService namespaces) {
 		this.transformations = transformations;
 		this.insights = insights;
 		this.documents = documents;
@@ -138,6 +141,7 @@ public class TransformationService {
 		this.settings = settings;
 		this.properties = properties;
 		this.caller = caller;
+		this.namespaces = namespaces;
 		this.caches = caches;
 		this.metrics = metrics;
 	}
@@ -210,19 +214,35 @@ public class TransformationService {
 	}
 
 	public List<Insight> insightsFor(UUID documentId) {
+		visibleDocument(documentId);
 		return this.insights.findByDocumentIdOrderByCreatedAtDesc(documentId);
 	}
 
 	@Transactional
 	public void deleteInsight(UUID id) {
-		this.insights.findById(id).ifPresent(this.insights::delete);
+		this.insights.findById(id)
+			.filter(i -> this.documents.findById(i.getDocumentId())
+				.map(d -> this.namespaces.canSee(d.getNamespace()))
+				.orElse(true))
+			.ifPresent(this.insights::delete);
+	}
+
+	/**
+	 * The document, if this caller may see it. A transformation's prompt can ask for anything —
+	 * "repeat the content verbatim" included — so running one is reading the document, and has
+	 * to be confined exactly as reading it is.
+	 */
+	private DocumentEntity visibleDocument(UUID documentId) {
+		return this.documents.findById(documentId)
+			.filter(d -> this.namespaces.canSee(d.getNamespace()))
+			.orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+					org.springframework.http.HttpStatus.NOT_FOUND, "Document not found"));
 	}
 
 	/** Runs one transformation over one document and stores the result. */
 	@Transactional
 	public Insight run(UUID documentId, String slug) {
-		DocumentEntity document = this.documents.findById(documentId)
-			.orElseThrow(() -> new IllegalArgumentException("Document not found"));
+		DocumentEntity document = visibleDocument(documentId);
 		Transformation transformation = this.transformations.findBySlug(slug)
 			.orElseThrow(() -> new IllegalArgumentException("Transformation not found: " + slug));
 

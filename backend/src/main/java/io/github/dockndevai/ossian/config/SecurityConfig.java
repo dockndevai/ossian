@@ -61,6 +61,13 @@ public class SecurityConfig {
 				// Not under /api/admin, but it decides how every future document in a namespace
 				// is cut, so it belongs behind the same role as the installation-wide setting.
 				.requestMatchers(HttpMethod.PUT, "/api/namespaces/*/chunking").hasRole("ossian-admin")
+				// The transformation library is shared, and a prompt is code: it can ask for a
+				// document back verbatim, and one marked applyOnIngest runs on every future upload in
+				// every namespace at the installation's model cost. Reading and running stay open;
+				// writing the library is an admin decision.
+				.requestMatchers(HttpMethod.POST, "/api/transformations", "/api/transformations/**").hasRole("ossian-admin")
+				.requestMatchers(HttpMethod.PUT, "/api/transformations/**").hasRole("ossian-admin")
+				.requestMatchers(HttpMethod.DELETE, "/api/transformations/**").hasRole("ossian-admin")
 				.anyRequest().authenticated())
 			.oauth2ResourceServer(oauth -> oauth
 				// Without this the resource server still resolves an "Authorization: Bearer osk_..."

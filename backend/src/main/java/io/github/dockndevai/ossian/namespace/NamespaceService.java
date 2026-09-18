@@ -109,6 +109,20 @@ public class NamespaceService {
 		return this.repository.save(entity);
 	}
 
+	/**
+	 * Whether the caller may see something filed in this namespace.
+	 *
+	 * <p>The check for anything addressed by id. A list is narrowed by {@link #effectiveFilter},
+	 * but an id reaches the row directly, and ids are not secrets: they appear in event feeds,
+	 * citations and logs. So every by-id lookup asks this, and a caller outside the namespace
+	 * gets the same 404 as for an id that does not exist.
+	 */
+	public boolean canSee(String namespace) {
+		return this.tenant.confinedNamespace()
+			.map(allowed -> NamespaceEntity.slug(allowed).equals(namespace))
+			.orElse(true);
+	}
+
 	public String resolve(String requested) {
 		Optional<String> confined = this.tenant.confinedNamespace();
 		if (confined.isPresent()) {

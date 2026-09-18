@@ -219,9 +219,13 @@ public class DocumentController {
 		return ResponseEntity.noContent().build();
 	}
 
-	/** A missing document is 404 rather than 403, so the response does not confirm what exists. */
+	/**
+	 * A missing document is 404 rather than 403, so the response does not confirm what exists —
+	 * and a document outside a confined key's namespace is missing, as far as that key can tell.
+	 */
 	private DocumentEntity load(UUID id) {
 		return this.documents.findById(id)
+			.filter(d -> this.namespaces.canSee(d.getNamespace()))
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 	}
 

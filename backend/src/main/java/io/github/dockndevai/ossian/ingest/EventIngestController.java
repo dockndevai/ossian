@@ -146,8 +146,12 @@ public class EventIngestController {
 	@GetMapping("/documents")
 	public Page<EventView> list(@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "50") int size) {
-		return this.events
-			.findAllByOrderByCreatedAtDesc(PageRequest.of(page, Math.min(size, 200)))
+		// Narrowed like every other list: the feed carries document ids, and a confined key that
+		// could read other namespaces' ids here could address those documents elsewhere.
+		PageRequest pageable = PageRequest.of(page, Math.min(size, 200));
+		return this.namespaces.effectiveFilter(null)
+			.map(ns -> this.events.findByNamespaceOrderByCreatedAtDesc(ns, pageable))
+			.orElseGet(() -> this.events.findAllByOrderByCreatedAtDesc(pageable))
 			.map(EventView::of);
 	}
 
@@ -157,7 +161,11 @@ public class EventIngestController {
 		// Idempotency first, before any work: a redelivery must be cheap as well as harmless.
 		var seen = this.events.findByEventId(request.eventId());
 		if (seen.isPresent()) {
-			return new EventResult(request.eventId(), IngestEvent.Status.DUPLICATE.name(), seen.get().getDocumentId(),
+			// The id is withheld when the original event belongs to a namespace this caller cannot
+			// see: event ids are caller-chosen and guessable, so echoing the document id would hand a
+			// confined key the address of a document it has no business naming.
+			UUID documentId = this.namespaces.canSee(seen.get().getNamespace()) ? seen.get().getDocumentId() : null;
+			return new EventResult(request.eventId(), IngestEvent.Status.DUPLICATE.name(), documentId,
 					"Already processed at " + seen.get().getCreatedAt());
 		}
 
