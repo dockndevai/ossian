@@ -51,7 +51,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 		+ "org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration,"
 		+ "org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration,"
 		+ "org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration",
-		"spring.cache.type=none" })
+		"spring.cache.type=none",
+		"LLM_EMBED_DIMENSIONS=768" })
 @AutoConfigureMockMvc
 @Import(TestAiConfig.class)
 class NamespaceConfinementTests {

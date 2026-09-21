@@ -43,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 		+ "org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration,"
 		+ "org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration,"
 		+ "org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration",
+		"LLM_EMBED_DIMENSIONS=1536",
 		"spring.cache.type=none" })
 @Import(MemoryTests.Stubs.class)
 class MemoryTests {
@@ -92,7 +93,7 @@ class MemoryTests {
 		}
 
 		/**
-		 * 768-dimension vectors keyed on the first word, so similarity is exactly 1 or 0.
+		 * 1536-dimension vectors keyed on the first word, so similarity is exactly 1 or 0.
 		 *
 		 * <p>Implemented on {@code call}, not on {@code embed(String)}. Every other method on
 		 * the interface is a default that routes through {@code call}, and the caching decorator
@@ -116,6 +117,11 @@ class MemoryTests {
 				}
 
 				@Override
+				public int dimensions() {
+					return 1536;
+				}
+
+				@Override
 				public float[] embed(Document document) {
 					return vectorFor(document.getText());
 				}
@@ -124,8 +130,8 @@ class MemoryTests {
 
 		static float[] vectorFor(String text) {
 			String first = text.strip().split("\\s+")[0].toLowerCase();
-			float[] v = new float[768];
-			v[Math.abs(first.hashCode()) % 768] = 1f;
+			float[] v = new float[1536];
+			v[Math.abs(first.hashCode()) % 1536] = 1f;
 			return v;
 		}
 

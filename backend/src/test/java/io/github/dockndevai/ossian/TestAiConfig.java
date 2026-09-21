@@ -95,8 +95,13 @@ public class TestAiConfig {
 			}
 
 			@Override
+			public int dimensions() {
+				return 768;
+			}
+
+			@Override
 			public float[] embed(Document document) {
-				return new float[] { 0.1f, 0.2f, 0.3f };
+				return new float[768];
 			}
 		};
 	}

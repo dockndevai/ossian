@@ -24,6 +24,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    placeholders:
+      embedDimensions: ${SPRING_AI_VECTORSTORE_PGVECTOR_DIMENSIONS:${LLM_EMBED_DIMENSIONS:768}}
 
   data:
     redis:

@@ -704,7 +704,12 @@ Postgres → Debezium → Kafka → Ossian example.
 | `ossian.retrieval.cache-seconds` | `300` | Retrieval cache TTL |
 | `ossian.chat.system-prompt` | see config | Instruction that enforces citation and refusal |
 | `LLM_BASE_URL` | `http://localhost:8090` | OpenAI-compatible endpoint |
-| `LLM_EMBED_MODEL` / `LLM_EMBED_DIMENSIONS` | `nomic-embed-text` / `768` | Must agree |
+| `LLM_EMBED_MODEL` / `LLM_EMBED_DIMENSIONS` | `nomic-embed-text` / `768` | Must agree; startup rejects mismatches |
+
+Changing `LLM_EMBED_DIMENSIONS` runs a Flyway migration that preserves memory text but clears
+old vectors before rebuilding the HNSW index. After the deployment, replay each memory through
+`POST /api/memory` so it is embedded with the new model; memories are intentionally not cast or
+silently padded because either would corrupt similarity search.
 
 Caches have deliberately different lifetimes: `embeddings` lives 30 days (identical text always
 embeds the same, so re-ingesting an unchanged file is free), `retrieval` only 5 minutes (the
