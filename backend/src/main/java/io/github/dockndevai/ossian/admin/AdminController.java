@@ -116,15 +116,15 @@ public class AdminController {
 		Instant since = Instant.now().minus(7, ChronoUnit.DAYS);
 		var scope = this.namespaces.effectiveFilter(namespace);
 		if (scope.isEmpty()) {
-			long asked = this.queryLog.countByCreatedAtAfter(since);
-			long unanswered = this.queryLog.countByAnsweredFalseAndCreatedAtAfter(since);
+			long asked = this.queryLog.countByFailureIsNullAndCreatedAtAfter(since);
+			long unanswered = this.queryLog.countByAnsweredFalseAndFailureIsNullAndCreatedAtAfter(since);
 			Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
 			return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(since),
 					this.queryLog.avgTopScore(since));
 		}
 		String ns = scope.get();
-		long asked = this.queryLog.countByNamespaceAndCreatedAtAfter(ns, since);
-		long unanswered = this.queryLog.countByNamespaceAndAnsweredFalseAndCreatedAtAfter(ns, since);
+		long asked = this.queryLog.countByNamespaceAndFailureIsNullAndCreatedAtAfter(ns, since);
+		long unanswered = this.queryLog.countByNamespaceAndAnsweredFalseAndFailureIsNullAndCreatedAtAfter(ns, since);
 		Double rate = (asked == 0) ? null : (double) (asked - unanswered) / asked;
 		return new RetrievalStats(asked, unanswered, rate, this.queryLog.avgLatency(ns, since),
 				this.queryLog.avgTopScore(ns, since));
@@ -134,8 +134,8 @@ public class AdminController {
 	@GetMapping("/gaps")
 	public List<GapView> gaps(@RequestParam(required = false) String namespace) {
 		List<QueryLog> rows = this.namespaces.effectiveFilter(namespace)
-			.map(ns -> this.queryLog.findTop50ByNamespaceAndAnsweredFalseOrderByCreatedAtDesc(ns))
-			.orElseGet(() -> this.queryLog.findTop50ByAnsweredFalseOrderByCreatedAtDesc());
+			.map(ns -> this.queryLog.findTop50ByNamespaceAndAnsweredFalseAndFailureIsNullOrderByCreatedAtDesc(ns))
+			.orElseGet(() -> this.queryLog.findTop50ByAnsweredFalseAndFailureIsNullOrderByCreatedAtDesc());
 		return rows.stream().map(GapView::of).toList();
 	}
 

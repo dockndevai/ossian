@@ -50,6 +50,11 @@ public class QueryLog {
 	@Column(name = "completion_tokens")
 	private Integer completionTokens;
 
+	@Column(name = "first_token_ms")
+	private Long firstTokenMs;
+
+	private String failure;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt = Instant.now();
 
@@ -126,6 +131,14 @@ public class QueryLog {
 	public void setCompletionTokens(Integer completionTokens) {
 		this.completionTokens = completionTokens;
 	}
+
+	public Long getFirstTokenMs() { return this.firstTokenMs; }
+
+	public void setFirstTokenMs(Long firstTokenMs) { this.firstTokenMs = firstTokenMs; }
+
+	public String getFailure() { return this.failure; }
+
+	public void setFailure(String failure) { this.failure = failure; }
 
 	public Instant getCreatedAt() {
 		return this.createdAt;
