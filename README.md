@@ -285,8 +285,9 @@ Append-only, and readable in the console. Every entry records the actor **as pre
 time** rather than a foreign key to a user: people leave and keys get revoked, and
 `key:nightly-import` still means something afterwards where a dangling reference does not.
 
-Recorded: document uploaded and deleted, key issued and revoked, setting changed, memory written
-and forgotten — with the outcome, so a rejected change is in the trail alongside an accepted one.
+Recorded: document uploaded and deleted, key issued, bound and revoked, setting changed, memory
+written and forgotten (deleted by id or by session, naming the acting key and the agent) — with
+the outcome, so a rejected change is in the trail alongside an accepted one.
 
 Two things are deliberately *not* recorded. Request bodies, because an audit row carrying them
 becomes a second copy of the data it is meant to be watching. And memory content — the subject and
@@ -374,10 +375,30 @@ would bury itself, so identical content in the same scope updates the existing r
 on read as well as by cleanup — a memory that outlives its stated lifetime is worse than one
 never kept.
 
-Scoped by `agentId`, narrowed by `sessionId` or `subject`. Two agents do not read each other's
-recollections. The **Memory** page in the console lists what each agent holds and runs the real
-ranking, so you can see what an agent *would* recall rather than searching the text on screen —
-an agent behaving oddly is usually an agent recalling something stale.
+Scoped by `agentId`, narrowed by `sessionId` or `subject`. The **Memory** page in the console
+lists what each agent holds and runs the real ranking, so you can see what an agent *would* recall
+rather than searching the text on screen — an agent behaving oddly is usually an agent recalling
+something stale.
+
+### Who can reach which agent's memory
+
+`agentId` is a label the **caller supplies**, not a credential, so on its own it keeps nobody out
+of anyone's memory. What separates agents is the API key an agent uses: a key can be **bound to an
+agent**, and a bound key is held to it.
+
+| Caller | Memory routes |
+|---|---|
+| Key bound to agent `X` | forced to `X`: an omitted `agentId` means `X`, naming another is a **403**, `GET /api/memory/agents` lists only `X`, and deleting another agent's memory by id is a **404** (no hint that it exists) |
+| Key with the `ossian-admin` role, not bound | any agent |
+| Key not confined to a namespace, not bound | any agent |
+| Key **confined to a namespace**, not bound | **403** until it is bound (unless `ossian.memory.allow-unbound-confined-keys=true`) |
+| A signed-in person, including the console | any agent |
+
+So two agents do not read each other's memory **if each uses a key bound to it** — that is a
+property of how you issue keys, not of the `agentId` field. An unbound key that is neither
+admin nor namespace-confined can still reach every agent, and a key with the admin role can
+change any binding, its own included. Bind every key an agent holds; how, and what to do about
+existing keys, is in [docs/agent-key-binding.md](docs/agent-key-binding.md).
 
 ---
 
@@ -434,8 +455,11 @@ npm install -g ossian-mcp
   "env": { "OSSIAN_URL": "http://localhost:8081", "OSSIAN_API_KEY": "osk_…" } } } }
 ```
 
-Issue the key from **Console → API keys**, and give it the narrowest scope that works — confined
-to a namespace, a key that leaks reads only what that agent was for.
+Issue the key with `POST /api/admin/api-keys` (see **Machine credentials**) and give it the
+narrowest scope that works — confined to a namespace, and **bound to the agent** that will hold
+it with `agentId`, so a key that leaks reads only what that agent was for. A bound key works with
+any client: an `agentId` that matches the binding is accepted, an omitted one defaults to it, and
+any other is a 403. How `ossian-mcp` fills in `agentId` is defined in its own repository.
 
 Seven tools: `ask_documents`, `list_namespaces`, `list_documents`, `add_document_from_url`,
 `remember`, `recall`, `forget_session`.
@@ -451,7 +475,7 @@ keys close that.
 # issue one (admin)
 curl -X POST localhost:8081/api/admin/api-keys \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"support-agent","roles":["ossian-user"],"namespace":"hr-policies"}'
+  -d '{"name":"support-agent","roles":["ossian-user"],"namespace":"hr-policies","agentId":"support-bot"}'
 
 # then, with no human anywhere
 curl -X POST localhost:8081/api/chat \
@@ -473,10 +497,17 @@ parameter, because for a confined credential there is no such thing as "no filte
 different namespace is a 403 rather than a silent redirect: a pipeline writing to the wrong place
 and being told nothing looks like it worked.
 
+A key can also be **bound to an agent** (`agentId`, at issue time or later with
+`PUT /api/admin/api-keys/{id}/agent`), which confines it on `/api/memory` the way a namespace
+confines it elsewhere — see **Who can reach which agent's memory** above. Existing keys are
+unbound; read [docs/agent-key-binding.md](docs/agent-key-binding.md) before upgrading, because a
+namespace-confined key that is not bound is now refused on the memory routes.
+
 | | user token | API key |
 |---|---|---|
 | roles from | `realm_access.roles` | the key's own roles |
 | namespace | any | all, or exactly one |
+| agent memory | any agent | any agent, or exactly one if the key is bound (and a confined key must be bound) |
 | revocable | via Keycloak | immediately, and the row is kept |
 
 ---

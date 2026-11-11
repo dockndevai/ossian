@@ -37,6 +37,22 @@ public class ApiKeyService {
 
 	private static final int SECRET_BYTES = 32;
 
+	/** Same ceiling as {@code agent_memories.agent_id} and the memory request bodies. */
+	public static final int AGENT_ID_MAX_LENGTH = 128;
+
+	/**
+	 * What a bound agent id may look like: no control characters and no leading or trailing
+	 * whitespace.
+	 *
+	 * <p>The charset is otherwise as open as the agentId memory routes accept, because a binding
+	 * has to be able to name any agent that already holds memories. The edges are closed because
+	 * {@code "bot"} and {@code "bot "} are different agents to the database and the same one to a
+	 * person reading a console, and a binding that only looks right is worse than none.
+	 */
+	public static final String AGENT_ID_PATTERN = "^[^\\p{Cntrl}\\s](?:[^\\p{Cntrl}]*[^\\p{Cntrl}\\s])?$";
+
+	private static final java.util.regex.Pattern AGENT_ID = java.util.regex.Pattern.compile(AGENT_ID_PATTERN);
+
 	private static final Logger log = LoggerFactory.getLogger(ApiKeyService.class);
 
 	private final ApiKeyRepository repository;
@@ -57,6 +73,19 @@ public class ApiKeyService {
 	@Transactional
 	public Issued issue(String name, List<String> roles, String namespace, Integer requestsPerMinute,
 			Instant expiresAt) {
+		return issue(name, roles, namespace, null, requestsPerMinute, expiresAt);
+	}
+
+	/**
+	 * Issues a key, optionally bound to one agent.
+	 *
+	 * @param agentId the agent the key acts as on memory routes; null for an unbound key
+	 * @throws IllegalArgumentException if agentId is present but not a valid agent id
+	 */
+	@Transactional
+	public Issued issue(String name, List<String> roles, String namespace, String agentId,
+			Integer requestsPerMinute, Instant expiresAt) {
+		String boundAgent = (agentId == null) ? null : requireValidAgentId(agentId);
 		byte[] bytes = new byte[SECRET_BYTES];
 		this.random.nextBytes(bytes);
 		String secret = PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -67,6 +96,7 @@ public class ApiKeyService {
 		entity.setKeyPrefix(secret.substring(0, Math.min(secret.length(), 12)));
 		entity.setRoles(roles == null || roles.isEmpty() ? "ossian-user" : String.join(",", roles));
 		entity.setNamespace((namespace == null || namespace.isBlank()) ? null : namespace);
+		entity.setAgentId(boundAgent);
 		entity.setCreatedBy(this.caller.username());
 		entity.setRequestsPerMinute(requestsPerMinute);
 		entity.setExpiresAt(expiresAt);
@@ -75,6 +105,40 @@ public class ApiKeyService {
 		// The name and prefix, never the secret. A key in a log file is a key in everyone's hands.
 		log.info("issued api key '{}' ({})", saved.getName(), saved.getKeyPrefix());
 		return new Issued(saved, secret);
+	}
+
+	/**
+	 * Binds a key to an agent, or unbinds it when agentId is null.
+	 *
+	 * <p>Takes effect on the key's next request: the key is resolved from the database every time
+	 * rather than cached, so there is no window in which the old binding still applies.
+	 *
+	 * @return the updated key, or empty if there is no such key
+	 * @throws IllegalArgumentException if agentId is present but not a valid agent id
+	 */
+	@Transactional
+	public Optional<ApiKeyEntity> bindAgent(UUID id, String agentId) {
+		String boundAgent = (agentId == null) ? null : requireValidAgentId(agentId);
+		return this.repository.findById(id).map(key -> {
+			key.setAgentId(boundAgent);
+			ApiKeyEntity saved = this.repository.save(key);
+			log.info("api key '{}' ({}) is now {}", saved.getName(), saved.getKeyPrefix(),
+					boundAgent == null ? "unbound" : "bound to agent '" + boundAgent + "'");
+			return saved;
+		});
+	}
+
+	/** Whether this is acceptable as the agent a key is bound to. */
+	public static boolean isValidAgentId(String agentId) {
+		return agentId != null && agentId.length() <= AGENT_ID_MAX_LENGTH && AGENT_ID.matcher(agentId).matches();
+	}
+
+	private static String requireValidAgentId(String agentId) {
+		if (!isValidAgentId(agentId)) {
+			throw new IllegalArgumentException("agentId must be 1-" + AGENT_ID_MAX_LENGTH
+					+ " characters, with no control characters and no leading or trailing whitespace");
+		}
+		return agentId;
 	}
 
 	/**

@@ -20,6 +20,8 @@ data:
   OSSIAN_INGEST_EMBEDDINGBATCHTOKENS: {{ .Values.ingest.embeddingBatchTokens | quote }}
   OSSIAN_RATELIMIT_KEYREQUESTSPERMINUTE: {{ .Values.rateLimit.keyRequestsPerMinute | quote }}
   OSSIAN_RATELIMIT_USERREQUESTSPERMINUTE: {{ .Values.rateLimit.userRequestsPerMinute | quote }}
+  # Default-deny for namespace-confined API keys that are bound to no agent; see values.yaml.
+  OSSIAN_MEMORY_ALLOWUNBOUNDCONFINEDKEYS: {{ .Values.memory.allowUnboundConfinedKeys | quote }}
   # The console is served same-origin through the frontend's nginx, so CORS needs no per-host
   # configuration. Left empty rather than wildcarded.
   OSSIAN_CORS_ALLOWEDORIGINS: ""
