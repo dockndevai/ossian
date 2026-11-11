@@ -83,8 +83,8 @@ class ApiKeyAuthTests {
 	@Test
 	@DisplayName("a confined key names its namespace; an unconfined one does not")
 	void confinementIsOnThePrincipal() {
-		ApiKeyPrincipal confined = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "pipeline", "hr-policies");
-		ApiKeyPrincipal open = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "console", null);
+		ApiKeyPrincipal confined = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "pipeline", "hr-policies", null);
+		ApiKeyPrincipal open = new ApiKeyPrincipal(java.util.UUID.randomUUID(), "console", null, null);
 
 		assertThat(confined.namespace()).isEqualTo("hr-policies");
 		assertThat(open.namespace()).isNull();

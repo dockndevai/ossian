@@ -24,6 +24,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class CallerContext {
 
+	/** The realm role that unlocks {@code /api/admin/**}, and the one that exempts a key from some limits. */
+	public static final String ADMIN_ROLE = "ossian-admin";
+
 	private static final String ANONYMOUS = "anonymous";
 
 	/** Stable identifier for the caller, used for audit and per-caller rate accounting. */
@@ -71,6 +74,21 @@ public class CallerContext {
 	 */
 	public Optional<String> confinedNamespace() {
 		return apiKey().map(ApiKeyPrincipal::namespace).filter(n -> n != null && !n.isBlank());
+	}
+
+	/**
+	 * The agent this caller is bound to, if any.
+	 *
+	 * <p>Only keys can be bound. A bound key acts as exactly one agent on memory routes: the agent
+	 * it names in a request is not a choice the caller gets to make.
+	 */
+	public Optional<String> boundAgent() {
+		return apiKey().map(ApiKeyPrincipal::agentId).filter(a -> a != null && !a.isBlank());
+	}
+
+	/** True when the caller holds the admin role, whether as a person or through a key. */
+	public boolean isAdmin() {
+		return roles().contains(ADMIN_ROLE);
 	}
 
 	/** True when this request authenticated with a key rather than as a person. */

@@ -42,6 +42,8 @@ public class AuditService {
 
 	public static final String KEY_REVOKED = "apikey.revoked";
 
+	public static final String KEY_UPDATED = "apikey.updated";
+
 	public static final String SETTING_CHANGED = "setting.changed";
 
 	public static final String TRANSFORMATION_CHANGED = "transformation.changed";
