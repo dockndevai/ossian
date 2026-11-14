@@ -16,6 +16,9 @@ import io.github.dockndevai.ossian.settings.SettingsService;
 import io.github.dockndevai.ossian.caller.CallerContext;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.EmptyUsage;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -208,33 +211,73 @@ public class RagService {
 		}
 
 		List<Dtos.Citation> citations = toCitations(hits);
-		String answer = this.chatClient.prompt()
+		ChatResponse response = this.chatClient.prompt()
 			.options(chatOptions())
 			.system(systemPrompt())
 			.user(buildUserMessage(request.question(), hits))
 			.call()
-			.content();
+			.chatResponse();
+		String answer = content(response);
+		Usage usage = usage(response);
 
 		long ms = (System.nanoTime() - started) / 1_000_000;
 		Double top = citations.isEmpty() ? null : citations.get(0).score();
-		record(request.question(), hits.size(), top, true, ms, null, null, request.namespace());
-		return new Dtos.AskResponse(answer, citations, true, ms, null, null);
+		Integer promptTokens = usage == null ? null : usage.getPromptTokens();
+		Integer completionTokens = usage == null ? null : usage.getCompletionTokens();
+		record(request.question(), hits.size(), top, true, ms, promptTokens, completionTokens, request.namespace());
+		return new Dtos.AskResponse(answer, citations, true, ms, promptTokens, completionTokens);
 	}
 
 	/** Token-by-token answer for the chat UI. */
 	public Flux<String> askStreaming(Dtos.AskRequest request) {
+		long started = System.nanoTime();
+		String subject = this.tenant.subject();
 		List<Document> hits = retrieve(request.question(), request.documentIds(), request.namespace());
 		if (hits.isEmpty()) {
-			record(request.question(), 0, null, false, 0L, null, null, request.namespace());
+			record(request.question(), 0, null, false, elapsed(started), null, null, request.namespace());
 			return Flux.just("I could not find anything about that in your documents.");
 		}
-		record(request.question(), hits.size(), scoreOf(hits.get(0)), true, 0L, null, null, request.namespace());
-		return this.chatClient.prompt()
-			.options(chatOptions())
-			.system(systemPrompt())
-			.user(buildUserMessage(request.question(), hits))
+		OpenAiChatOptions options = chatOptions(true);
+		String system = systemPrompt();
+		String user = buildUserMessage(request.question(), hits);
+		return Flux.defer(() -> {
+			final Usage[] lastUsage = { null };
+			final Long[] firstTokenMs = { null };
+			return Flux.defer(() -> this.chatClient.prompt()
+			.options(options)
+			.system(system)
+			.user(user)
 			.stream()
-			.content();
+			.chatResponse())
+			.doOnNext(response -> {
+				Usage current = usage(response);
+				if (current != null) lastUsage[0] = current;
+				if (firstTokenMs[0] == null && !content(response).isEmpty()) firstTokenMs[0] = elapsed(started);
+			})
+			.map(RagService::content)
+			.filter(text -> !text.isEmpty())
+			.doFinally(signal -> record(subject, request.question(), hits.size(), scoreOf(hits.get(0)),
+					signal == reactor.core.publisher.SignalType.ON_COMPLETE, elapsed(started),
+					lastUsage[0] == null ? null : lastUsage[0].getPromptTokens(),
+					lastUsage[0] == null ? null : lastUsage[0].getCompletionTokens(), request.namespace(),
+					firstTokenMs[0], signal == reactor.core.publisher.SignalType.ON_COMPLETE ? null : signal.name()));
+		});
+	}
+
+	private static long elapsed(long started) {
+		return Math.max(1, (System.nanoTime() - started + 999_999) / 1_000_000);
+	}
+
+	private static Usage usage(ChatResponse response) {
+		if (response == null || response.getMetadata() == null) return null;
+		Usage usage = response.getMetadata().getUsage();
+		return usage instanceof EmptyUsage ? null : usage;
+	}
+
+	private static String content(ChatResponse response) {
+		if (response == null || response.getResult() == null || response.getResult().getOutput() == null) return "";
+		String text = response.getResult().getOutput().getText();
+		return text == null ? "" : text;
 	}
 
 	/**
@@ -245,10 +288,15 @@ public class RagService {
 	 * this process use different models.
 	 */
 	private OpenAiChatOptions chatOptions() {
+		return chatOptions(false);
+	}
+
+	private OpenAiChatOptions chatOptions(boolean streamUsage) {
 		return OpenAiChatOptions.builder()
 			.model(this.settings.effective(SettingsService.CHAT_MODEL))
 			.temperature(this.settings.effectiveDouble(SettingsService.CHAT_TEMPERATURE))
 			.maxTokens(this.settings.effectiveInt(SettingsService.CHAT_MAX_TOKENS))
+			.streamUsage(streamUsage)
 			.build();
 	}
 
@@ -344,9 +392,15 @@ public class RagService {
 
 	private void record(String question, int chunks, Double topScore, boolean answered, long latencyMs,
 			Integer promptTokens, Integer completionTokens, String namespace) {
+		record(this.tenant.subject(), question, chunks, topScore, answered, latencyMs, promptTokens,
+				completionTokens, namespace, null, null);
+	}
+
+	private void record(String subject, String question, int chunks, Double topScore, boolean answered, long latencyMs,
+			Integer promptTokens, Integer completionTokens, String namespace, Long firstTokenMs, String failure) {
 		try {
 			QueryLog entry = new QueryLog();
-			entry.setSubject(this.tenant.subject());
+			entry.setSubject(subject);
 			entry.setQuestion(question.substring(0, Math.min(question.length(), 2000)));
 			entry.setNamespace(namespace);
 			entry.setChunksRetrieved(chunks);
@@ -355,6 +409,8 @@ public class RagService {
 			entry.setLatencyMs(latencyMs);
 			entry.setPromptTokens(promptTokens);
 			entry.setCompletionTokens(completionTokens);
+			entry.setFirstTokenMs(firstTokenMs);
+			entry.setFailure(failure);
 			this.queryLog.save(entry);
 		}
 		catch (RuntimeException ex) {

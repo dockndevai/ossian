@@ -14,11 +14,11 @@ public interface QueryLogRepository extends JpaRepository<QueryLog, UUID> {
 	Page<QueryLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
 	/** The gap analysis: what people asked that the corpus could not answer. */
-	List<QueryLog> findTop50ByAnsweredFalseOrderByCreatedAtDesc();
+	List<QueryLog> findTop50ByAnsweredFalseAndFailureIsNullOrderByCreatedAtDesc();
 
-	long countByCreatedAtAfter(Instant since);
+	long countByFailureIsNullAndCreatedAtAfter(Instant since);
 
-	long countByAnsweredFalseAndCreatedAtAfter(Instant since);
+	long countByAnsweredFalseAndFailureIsNullAndCreatedAtAfter(Instant since);
 
 	@Query("select avg(q.latencyMs) from QueryLog q where q.createdAt > ?1")
 	Double avgLatency(Instant since);
@@ -34,12 +34,12 @@ public interface QueryLogRepository extends JpaRepository<QueryLog, UUID> {
 	 * These deliberately match on equality rather than treating null as a wildcard.
 	 */
 
-	long countByNamespaceAndCreatedAtAfter(String namespace, Instant since);
+	long countByNamespaceAndFailureIsNullAndCreatedAtAfter(String namespace, Instant since);
 
-	long countByNamespaceAndAnsweredFalseAndCreatedAtAfter(String namespace,
+	long countByNamespaceAndAnsweredFalseAndFailureIsNullAndCreatedAtAfter(String namespace,
 			Instant since);
 
-	List<QueryLog> findTop50ByNamespaceAndAnsweredFalseOrderByCreatedAtDesc(String namespace);
+	List<QueryLog> findTop50ByNamespaceAndAnsweredFalseAndFailureIsNullOrderByCreatedAtDesc(String namespace);
 
 	@Query("select avg(q.latencyMs) from QueryLog q "
 			+ "where q.namespace = ?1 and q.createdAt > ?2")

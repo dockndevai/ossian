@@ -11,6 +11,8 @@ import org.testcontainers.utility.DockerImageName;
 
 import io.github.dockndevai.ossian.document.DocumentEntity;
 import io.github.dockndevai.ossian.document.DocumentRepository;
+import io.github.dockndevai.ossian.chat.QueryLog;
+import io.github.dockndevai.ossian.chat.QueryLogRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -80,6 +82,9 @@ class AccessControlTests {
 	@Autowired
 	private DocumentRepository documents;
 
+	@Autowired
+	private QueryLogRepository queryLogs;
+
 	@BeforeEach
 	void seed() {
 		this.documents.deleteAll();
@@ -148,6 +153,32 @@ class AccessControlTests {
 				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ossian-admin"))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.documents").value(1));
+	}
+
+	@Test
+	void generationFailuresAreNotRetrievalGaps() throws Exception {
+		this.queryLogs.deleteAll();
+		QueryLog gap = new QueryLog();
+		gap.setQuestion("missing knowledge");
+		gap.setNamespace("hr");
+		gap.setAnswered(false);
+		this.queryLogs.save(gap);
+		QueryLog failure = new QueryLog();
+		failure.setQuestion("model failed");
+		failure.setNamespace("hr");
+		failure.setAnswered(false);
+		failure.setFailure("ON_ERROR");
+		this.queryLogs.save(failure);
+		var admin = jwt().authorities(new SimpleGrantedAuthority("ROLE_ossian-admin"));
+		for (String namespace : new String[] { "", "hr" }) {
+			this.mvc.perform(get("/api/admin/stats/retrieval").param("namespace", namespace).with(admin))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.questionsLast7d").value(1))
+				.andExpect(jsonPath("$.unansweredLast7d").value(1));
+			this.mvc.perform(get("/api/admin/gaps").param("namespace", namespace).with(admin))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].question").value("missing knowledge"));
+		}
+		this.queryLogs.deleteAll();
 	}
 
 	@Test
