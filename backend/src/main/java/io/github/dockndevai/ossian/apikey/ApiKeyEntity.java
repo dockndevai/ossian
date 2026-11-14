@@ -36,6 +36,16 @@ public class ApiKeyEntity {
 	@Column(length = 128)
 	private String namespace;
 
+	/**
+	 * The agent this key acts as on memory routes; null means the key is not bound.
+	 *
+	 * <p>A bound key can only ever read, write or forget this agent's memory, whatever agentId a
+	 * request names. Unbound is not the same as unrestricted: see {@code MemoryAccess} for what an
+	 * unbound key may do.
+	 */
+	@Column(name = "agent_id", length = 128)
+	private String agentId;
+
 	/** This key's own ceiling; null means the installation default. */
 	@Column(name = "requests_per_minute")
 	private Integer requestsPerMinute;
@@ -117,6 +127,14 @@ public class ApiKeyEntity {
 
 	public void setNamespace(String namespace) {
 		this.namespace = namespace;
+	}
+
+	public String getAgentId() {
+		return this.agentId;
+	}
+
+	public void setAgentId(String agentId) {
+		this.agentId = agentId;
 	}
 
 	public String getCreatedBy() {

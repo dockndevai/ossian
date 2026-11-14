@@ -10,8 +10,10 @@ import java.util.UUID;
  * indifferent to how the caller authenticated.
  *
  * @param namespace optional confinement; when set, this key may only touch that namespace
+ * @param agentId optional binding; when set, this key acts as that agent on memory routes and
+ * cannot name another
  */
-public record ApiKeyPrincipal(UUID keyId, String name, String namespace) {
+public record ApiKeyPrincipal(UUID keyId, String name, String namespace, String agentId) {
 
 	/** What appears as the actor on anything this key creates. */
 	public String actor() {

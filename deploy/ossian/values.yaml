@@ -78,6 +78,13 @@ rateLimit:
   keyRequestsPerMinute: 120
   userRequestsPerMinute: 600
 
+memory:
+  # Whether an API key that is confined to a namespace but bound to no agent may use /api/memory.
+  # False, because that route takes the agentId from the caller: an unbound key can read and erase
+  # every agent's memory by naming them. Bind such keys instead (see docs/agent-key-binding.md).
+  # Set true ONLY as a stop-gap while binding them; it restores the old behaviour for those keys.
+  allowUnboundConfinedKeys: false
+
 ingress:
   enabled: false
   className: nginx

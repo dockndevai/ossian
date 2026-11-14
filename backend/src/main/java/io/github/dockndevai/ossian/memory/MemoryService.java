@@ -117,7 +117,10 @@ public class MemoryService {
 	 * Recalls what is relevant, ranked by similarity, recency and importance.
 	 *
 	 * <p>Scoping is additive: an agent sees its own memories and narrows further by session or
-	 * subject if it asks to. Two agents do not read each other's recollections by default.
+	 * subject if it asks to.
+	 *
+	 * <p>This method trusts the agentId it is given. Which agent a caller may name is decided
+	 * before it gets here, by {@link MemoryAccess}; nothing below that layer checks again.
 	 */
 	public List<Memory> recall(String query, String agentId, String sessionId, String subject, int topK,
 			double minSimilarity) {
@@ -145,6 +148,16 @@ public class MemoryService {
 
 	/** The agents that hold memories, with what each is carrying. */
 	public List<AgentSummary> agents() {
+		return agents(null);
+	}
+
+	/**
+	 * The agents that hold memories, optionally only one of them.
+	 *
+	 * @param onlyAgent when not null, summarise just this agent. The filter is in the query, not
+	 * applied afterwards, so a caller limited to one agent never has another's row in hand.
+	 */
+	public List<AgentSummary> agents(String onlyAgent) {
 		return this.jdbc.query("""
 				select agent_id,
 				       count(*) as total,
@@ -153,12 +166,13 @@ public class MemoryService {
 				       max(created_at) as newest,
 				       count(*) filter (where expires_at is not null) as expiring
 				from agent_memories
-				where expires_at is null or expires_at > now()
+				where (expires_at is null or expires_at > now())
+				  and (?::text is null or agent_id = ?)
 				group by agent_id
 				order by max(created_at) desc
 				""", (rs, i) -> new AgentSummary(rs.getString("agent_id"), rs.getLong("total"),
 				rs.getLong("sessions"), rs.getLong("subjects"), rs.getLong("expiring"),
-				rs.getTimestamp("newest").toInstant()));
+				rs.getTimestamp("newest").toInstant()), onlyAgent, onlyAgent);
 	}
 
 	/** One agent's memory at a glance, for an operator deciding whether it knows too much. */
@@ -210,7 +224,26 @@ public class MemoryService {
 
 	@Transactional
 	public boolean forget(UUID id) {
-		return this.jdbc.update("delete from agent_memories where id = ?", id) > 0;
+		return forget(id, null).isPresent();
+	}
+
+	/**
+	 * Forgets one memory, optionally only if it belongs to the given agent.
+	 *
+	 * <p>The ownership check is part of the delete, not a lookup before it: a caller limited to
+	 * one agent cannot delete another's memory by racing the check, and a row that is not theirs
+	 * is indistinguishable from one that does not exist.
+	 *
+	 * @param onlyAgent when not null, delete only if the memory belongs to this agent
+	 * @return the agent the deleted memory belonged to, or empty if nothing was deleted
+	 */
+	@Transactional
+	public java.util.Optional<String> forget(UUID id, String onlyAgent) {
+		return this.jdbc.queryForList("""
+				delete from agent_memories
+				where id = ? and (?::text is null or agent_id = ?)
+				returning agent_id
+				""", String.class, id, onlyAgent, onlyAgent).stream().findFirst();
 	}
 
 	/** Forgets a whole session — what you call when a conversation ends. */

@@ -47,7 +47,8 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 					.stream()
 					.map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role))
 					.toList();
-				ApiKeyPrincipal principal = new ApiKeyPrincipal(key.getId(), key.getName(), key.getNamespace());
+				ApiKeyPrincipal principal = new ApiKeyPrincipal(key.getId(), key.getName(), key.getNamespace(),
+						key.getAgentId());
 				// Null credentials: the secret has done its job and must not travel further.
 				var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
 				SecurityContextHolder.getContext().setAuthentication(authentication);

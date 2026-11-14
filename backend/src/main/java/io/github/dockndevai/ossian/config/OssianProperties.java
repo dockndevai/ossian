@@ -25,6 +25,16 @@ public class OssianProperties {
 
 	private RateLimit rateLimit = new RateLimit();
 
+	private Memory memory = new Memory();
+
+	public Memory getMemory() {
+		return this.memory;
+	}
+
+	public void setMemory(Memory memory) {
+		this.memory = memory;
+	}
+
 	public Ingest getIngest() {
 		return this.ingest;
 	}
@@ -438,6 +448,34 @@ public class OssianProperties {
 
 	}
 
+
+	/** Who may reach agent memory, beyond what the routes' own authentication requires. */
+	public static class Memory {
+
+		/**
+		 * Whether an API key that is confined to a namespace but bound to no agent may still use
+		 * the memory routes, as every key could before keys could be bound.
+		 *
+		 * <p>False by default. {@code /api/memory} is keyed by an agentId the caller supplies, so
+		 * an unbound key can read and erase every agent's memory by naming them. A key an
+		 * operator went to the trouble of confining is exactly the key that must not be able to
+		 * do that, so it is refused until it is bound to an agent. Set this only as a stop-gap
+		 * while existing keys are being bound; it restores the old behaviour for them.
+		 *
+		 * <p>Keys holding the admin role, and keys with no namespace confinement, are not
+		 * affected either way.
+		 */
+		private boolean allowUnboundConfinedKeys = false;
+
+		public boolean isAllowUnboundConfinedKeys() {
+			return this.allowUnboundConfinedKeys;
+		}
+
+		public void setAllowUnboundConfinedKeys(boolean allowUnboundConfinedKeys) {
+			this.allowUnboundConfinedKeys = allowUnboundConfinedKeys;
+		}
+
+	}
 
 	/** How many requests a caller may make. Zero or less disables the limit for that kind. */
 	public static class RateLimit {

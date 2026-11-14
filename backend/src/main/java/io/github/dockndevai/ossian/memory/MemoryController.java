@@ -25,17 +25,23 @@ import org.springframework.web.bind.annotation.RestController;
  * this is the agent's own recollection of what happened and what it was told, which has different
  * lifetime, different ranking and a different audience. Mixing them would put "the user said they
  * prefer email" in the citations of an answer about the deployment policy.
+ *
+ * <p>Every route asks {@link MemoryAccess} which agent the caller may act on, rather than taking
+ * the agentId from the request: a key bound to an agent is held to it. Authentication alone is
+ * not enough here, because the agentId is the only thing separating one agent's memory from
+ * another's and the caller is the one supplying it.
  */
 @RestController
 @RequestMapping("/api/memory")
 public class MemoryController {
 
-	public record RememberRequest(@NotBlank @Size(max = 128) String agentId, @Size(max = 128) String sessionId,
+	/** {@code agentId} may be omitted by a key bound to an agent; anyone else must name one. */
+	public record RememberRequest(@Size(max = 128) String agentId, @Size(max = 128) String sessionId,
 			@Size(max = 256) String subject, @Size(max = 32) String kind,
 			@NotBlank @Size(max = 8000) String content, String metadata, Double importance, Long ttlSeconds) {
 	}
 
-	public record RecallRequest(@NotBlank @Size(max = 128) String agentId, @NotBlank @Size(max = 2000) String query,
+	public record RecallRequest(@Size(max = 128) String agentId, @NotBlank @Size(max = 2000) String query,
 			@Size(max = 128) String sessionId, @Size(max = 256) String subject, Integer topK,
 			Double minSimilarity) {
 	}
@@ -55,14 +61,19 @@ public class MemoryController {
 
 	private final io.github.dockndevai.ossian.audit.AuditService audit;
 
-	public MemoryController(MemoryService memories, io.github.dockndevai.ossian.audit.AuditService audit) {
+	private final MemoryAccess access;
+
+	public MemoryController(MemoryService memories, io.github.dockndevai.ossian.audit.AuditService audit,
+			MemoryAccess access) {
 		this.memories = memories;
 		this.audit = audit;
+		this.access = access;
 	}
 
 	@PostMapping
 	public ResponseEntity<MemoryService.Memory> remember(@Valid @RequestBody RememberRequest request) {
-		MemoryService.Memory saved = this.memories.remember(request.agentId(), request.sessionId(),
+		String agentId = this.access.agentFor(request.agentId());
+		MemoryService.Memory saved = this.memories.remember(agentId, request.sessionId(),
 				request.subject(), (request.kind() == null || request.kind().isBlank()) ? "fact" : request.kind(),
 				request.content(), request.metadata(), request.importance(), request.ttlSeconds());
 		// The subject and kind, not the content: an audit row that copies what was recorded
@@ -80,7 +91,8 @@ public class MemoryController {
 		double floor = (request.minSimilarity() == null) ? DEFAULT_MIN_SIMILARITY
 				: Math.min(Math.max(request.minSimilarity(), 0), 1);
 
-		List<MemoryService.Memory> found = this.memories.recall(request.query(), request.agentId(),
+		String agentId = this.access.agentFor(request.agentId());
+		List<MemoryService.Memory> found = this.memories.recall(request.query(), agentId,
 				request.sessionId(), request.subject(), topK, floor);
 		// Use is recorded for the console. It does not refresh a memory's age: a stale fact is
 		// recalled alongside the newer one contradicting it, and refreshing both would tie them.
@@ -88,33 +100,54 @@ public class MemoryController {
 		return found;
 	}
 
-	/** Which agents hold memories. The entry point for an operator who does not know the ids. */
+	/**
+	 * Which agents hold memories. The entry point for an operator who does not know the ids.
+	 *
+	 * <p>A key bound to an agent is told about that agent only: the existence of the others is
+	 * not its business.
+	 */
 	@GetMapping("/agents")
 	public List<MemoryService.AgentSummary> agents() {
-		return this.memories.agents();
+		return this.memories.agents(this.access.restriction().orElse(null));
 	}
 
 	@GetMapping
-	public List<MemoryService.Memory> list(@RequestParam String agentId,
+	public List<MemoryService.Memory> list(@RequestParam(required = false) String agentId,
 			@RequestParam(required = false) String sessionId, @RequestParam(defaultValue = "50") int limit) {
-		return this.memories.list(agentId, sessionId, Math.min(Math.max(limit, 1), 200));
+		return this.memories.list(this.access.agentFor(agentId), sessionId, Math.min(Math.max(limit, 1), 200));
 	}
 
+	/**
+	 * Deletes one memory by id.
+	 *
+	 * <p>For a key bound to an agent, a memory that belongs to anyone else is a 404, the same as
+	 * an id that was never issued. Ids are not secrets — they appear in recall results — so a 403
+	 * here would confirm that the id exists and whose it is.
+	 */
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> forget(@PathVariable UUID id) {
-		if (!this.memories.forget(id)) {
+		java.util.Optional<String> forgotten = this.memories.forget(id, this.access.restriction().orElse(null));
+		if (forgotten.isEmpty()) {
 			return ResponseEntity.notFound().build();
 		}
+		// The agent is in the detail and the acting key is the audit row's subject: together they
+		// answer "whose memory was erased, and by what", without restating what it said.
 		this.audit.record(io.github.dockndevai.ossian.audit.AuditService.MEMORY_FORGOTTEN, "memory",
-				id.toString(), null, null);
+				id.toString(), null, "agent=" + forgotten.get());
 		return ResponseEntity.noContent().build();
 	}
 
 	/** Ends a conversation's memory. What you call when a session is over. */
 	@DeleteMapping("/sessions/{sessionId}")
-	public ResponseEntity<java.util.Map<String, Integer>> forgetSession(@RequestParam String agentId,
-			@PathVariable String sessionId) {
-		return ResponseEntity.ok(java.util.Map.of("forgotten", this.memories.forgetSession(agentId, sessionId)));
+	public ResponseEntity<java.util.Map<String, Integer>> forgetSession(
+			@RequestParam(required = false) String agentId, @PathVariable String sessionId) {
+		String agent = this.access.agentFor(agentId);
+		int forgotten = this.memories.forgetSession(agent, sessionId);
+		// Recorded even when nothing matched: an erase that was attempted is worth knowing about,
+		// and "forgotten=0" is what distinguishes a mistyped session id from a missing row.
+		this.audit.record(io.github.dockndevai.ossian.audit.AuditService.MEMORY_FORGOTTEN, "memory.session",
+				sessionId, null, "agent=" + agent + " forgotten=" + forgotten);
+		return ResponseEntity.ok(java.util.Map.of("forgotten", forgotten));
 	}
 
 }
